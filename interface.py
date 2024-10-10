@@ -35,7 +35,7 @@ st.set_page_config(layout="wide")
 #plt.show()
 
 
-st.title("Trabalho PAI")
+# st.title("Trabalho PAI")
 container = st.container()
 
 if "ROIsDaImagem" not in st.session_state:
@@ -47,6 +47,8 @@ if "imagensVariadas" not in st.session_state:
 
 
 def escolherImagem(imagem, n,m):
+    if not isinstance(imagem, np.ndarray):
+        imagem = np.array(imagem)
     st.session_state.imagemEscolhida = imagem
 
 def transformar_imagens_mat_em_botoes_na_sidebar(arquivo_mat):
@@ -98,7 +100,7 @@ with container:
     col2 = c2.container();
     if (st.session_state.imagemEscolhida is not None):
         with col1:
-            cropped_img = st_cropper(Image.fromarray(st.session_state.imagemEscolhida), realtime_update=True, box_color='#0000FF', aspect_ratio=(1,1))
+            cropped_img = st_cropper(Image.fromarray(st.session_state.imagemEscolhida), realtime_update=True, box_color='#0000FF', aspect_ratio=(20,20))
             st.session_state.ROIsDaImagem = cropped_img;
             histograma(st.session_state.imagemEscolhida)
     if (st.session_state.ROIsDaImagem is not None):
