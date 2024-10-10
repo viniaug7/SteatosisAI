@@ -2,6 +2,7 @@
 # pip install streamlit, scipy, numpy
 # streamlit run interface.py
 import streamlit as st
+from random import randint
 import scipy.io
 import numpy as np
 import io
@@ -54,18 +55,21 @@ def transformar_imagens_mat_em_botoes_na_sidebar(arquivo_mat):
 # Upload de arquivo no topo do sidebar
 st.sidebar.title("Adicionar Foto")
 arquivo = st.sidebar.file_uploader("Carregar uma imagem", type=["mat", "jpeg", "jpg", "png"])
+if "imagensVariadas" not in st.session_state:
+    st.session_state.imagensVariadas = []
 
-#aqui é onde vamos receber as imagens (esta no sidebar)
-if arquivo:
+if arquivo and arquivo.name not in [nome for nome, _  in st.session_state.imagensVariadas]:
     imagem= None
     # Verifica o tipo de arquivo
     if arquivo.type in ["image/jpeg", "image/png"]:
         imagem = Image.open(arquivo)
-        sdContainer = st.sidebar.container()
-        with sdContainer.expander('Imagens diversas'):
-            btn = st.button(f"Imagem {arquivo.name}", key=f"botao_{arquivo.name}", on_click=imagemEscolhida, args=[imagem, None, None]) 
+        st.session_state.imagensVariadas.append((arquivo.name, imagem))
 
     elif arquivo.type == "application/octet-stream":  # Para arquivos .mat
         transformar_imagens_mat_em_botoes_na_sidebar(arquivo)
             
+
+with st.sidebar.expander('Imagens diversas'):
+    for nome, img in st.session_state.imagensVariadas:
+        st.button(f"Imagem {nome}", key=f"botao_{randint(0, 9999999)}", on_click=imagemEscolhida, args=[img, None, None])
 
