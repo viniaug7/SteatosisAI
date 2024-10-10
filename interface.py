@@ -11,7 +11,16 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 
+
+
+
+
+
+
+
 st.set_page_config(layout="wide")
+
+
 
 
 # do ipynb do canvas:
@@ -62,8 +71,18 @@ def transformar_imagens_mat_em_botoes_na_sidebar(arquivo_mat):
                 imagem = images[0][n][m]
                 btn = st.button(f"Imagem {m+1} do Paciente {n+1}", key=f"botao_{n}_{m}", use_container_width=True, on_click=escolherImagem, args=[imagem, n,m]) 
 
+def carregar_arquivo_mat(caminho_arquivo):
+    try:
+        transformar_imagens_mat_em_botoes_na_sidebar(caminho_arquivo)
+    except FileNotFoundError:
+        print(f"Arquivo {caminho_arquivo} não encontrado.")
+    except Exception as e:
+        print(f"Erro ao carregar o arquivo: {e}")
 
-
+if "arquivo_mat_carregado" not in st.session_state:
+    # Carregar o arquivo .mat apenas uma vez
+    carregar_arquivo_mat("./base/dataset_liver_bmodes_steatosis_assessment_IJCARS.mat")
+    st.session_state.arquivo_mat_carregado = True  # Marcar como carregado
 
 # Upload de arquivo no topo do sidebar
 st.sidebar.title("Adicionar Foto")
