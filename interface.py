@@ -37,16 +37,16 @@ st.set_page_config(layout="wide")
 
 st.title("Trabalho PAI")
 container = st.container()
-mainCol1, mainCol2 = container.columns(2)
 
+if "ROIsDaImagem" not in st.session_state:
+    st.session_state.ROIsDaImagem = None 
 if "imagemEscolhida" not in st.session_state:
-    st.session_state.imagemEscolhida = []
+    st.session_state.imagemEscolhida = None
 if "imagensVariadas" not in st.session_state:
     st.session_state.imagensVariadas = []
 
 
 def escolherImagem(imagem, n,m):
-    # mainCol1.image(imagem, caption="Imagem escolhida")
     st.session_state.imagemEscolhida = imagem
 
 def transformar_imagens_mat_em_botoes_na_sidebar(arquivo_mat):
@@ -78,21 +78,32 @@ if arquivo and arquivo.name not in [nome for nome, _  in st.session_state.imagen
         transformar_imagens_mat_em_botoes_na_sidebar(arquivo)
             
 
+def histograma(imagem):
+    image_array = np.array(imagem)
+    plt.hist(image_array.flatten(), bins=256, range=(0, 256), color='black')
+    plt.title('Histograma em Escala de Cinza')
+    plt.xlabel('Intensidade de pixel')
+    plt.ylabel('Número de pixels')
+    st.pyplot(plt)
+    plt.clf()
+
 
 with st.sidebar.expander('Imagens diversas'):
     for nome, img in st.session_state.imagensVariadas:
         st.button(f"Imagem {nome}", key=f"botao_{randint(0, 9999999)}", on_click=escolherImagem, args=[img, None, None])
 
-with mainCol1:
-    if (len(st.session_state.imagemEscolhida) != 0):
-        cropped_img = st_cropper(Image.fromarray(st.session_state.imagemEscolhida), realtime_update=False, box_color='#0000FF', aspect_ratio=(1,1))
-
-with mainCol2:
-    if (len(st.session_state.imagemEscolhida) != 0):
-        image_array = np.array(st.session_state.imagemEscolhida)
-        plt.hist(image_array.flatten(), bins=256, range=(0, 256), color='black')
-        plt.title('Histograma em Escala de Cinza')
-        plt.xlabel('Intensidade de pixel')
-        plt.ylabel('Número de pixels')
-        mainCol2.pyplot(plt)
-        plt.clf()
+with container:
+    c1, c2 = st.columns(2);
+    col1 = c1.container();
+    col2 = c2.container();
+    if (st.session_state.imagemEscolhida is not None):
+        with col1:
+            cropped_img = st_cropper(Image.fromarray(st.session_state.imagemEscolhida), realtime_update=True, box_color='#0000FF', aspect_ratio=(1,1))
+            st.session_state.ROIsDaImagem = cropped_img;
+            histograma(st.session_state.imagemEscolhida)
+    if (st.session_state.ROIsDaImagem is not None):
+        with col2:
+            
+            st.write(f"ROI: {st.session_state.ROIsDaImagem.size}")
+            st.image(st.session_state.ROIsDaImagem)
+            histograma(st.session_state.ROIsDaImagem)
