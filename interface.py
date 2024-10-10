@@ -45,7 +45,8 @@ st.set_page_config(layout="wide")
 
 
 # st.title("Trabalho PAI")
-container = st.container()
+mainTab, verROITab = st.tabs(["Imagem & Cortar ROI", "Ver ROIs"])
+mainContainer = mainTab.container()
 
 if "ROIsDaImagem" not in st.session_state:
     st.session_state.ROIsDaImagem = None 
@@ -58,7 +59,7 @@ if "imagensVariadas" not in st.session_state:
 def escolherImagem(imagem, n,m):
     if not isinstance(imagem, np.ndarray):
         imagem = np.array(imagem)
-    st.session_state.imagemEscolhida = imagem
+    st.session_state.imagemEscolhida = (imagem, n, m)
 
 def transformar_imagens_mat_em_botoes_na_sidebar(arquivo_mat):
     # Carregar arquivo .mat
@@ -66,10 +67,10 @@ def transformar_imagens_mat_em_botoes_na_sidebar(arquivo_mat):
     data_array = data["data"]
     images = data_array["images"]
     for n in range(55):
-        with st.sidebar.expander(f"Paciente {n+1}"):
+        with st.sidebar.expander(f"Paciente {n}"):
             for m in range(10):
                 imagem = images[0][n][m]
-                btn = st.button(f"Imagem {m+1} do Paciente {n+1}", key=f"botao_{n}_{m}", use_container_width=True, on_click=escolherImagem, args=[imagem, n,m]) 
+                btn = st.button(f"Imagem {m} do Paciente {n}", key=f"botao_{n}_{m}", use_container_width=True, on_click=escolherImagem, args=[imagem, n,m]) 
 
 def carregar_arquivo_mat(caminho_arquivo):
     try:
@@ -113,18 +114,25 @@ with st.sidebar.expander('Imagens diversas'):
     for nome, img in st.session_state.imagensVariadas:
         st.button(f"Imagem {nome}", key=f"botao_{randint(0, 9999999)}", on_click=escolherImagem, args=[img, None, None])
 
-with container:
+with mainContainer:
     c1, c2 = st.columns(2);
     col1 = c1.container();
     col2 = c2.container();
     if (st.session_state.imagemEscolhida is not None):
+        img = st.session_state.imagemEscolhida[0]
+        n = st.session_state.imagemEscolhida[1]
+        m = st.session_state.imagemEscolhida[2]
         with col1:
-            cropped_img = st_cropper(Image.fromarray(st.session_state.imagemEscolhida), realtime_update=True, box_color='#0000FF', aspect_ratio=(20,20))
+            cropped_img = st_cropper(Image.fromarray(img), realtime_update=True, box_color='#90ee90', aspect_ratio=(20,20))
             st.session_state.ROIsDaImagem = cropped_img;
-            histograma(st.session_state.imagemEscolhida)
+            insideC1, insideC2 = st.columns(2)
+            with insideC1:
+                st.button('Salvar ROI')
+            with insideC2:
+                if (n is not None):
+                    st.write(f"ROI Paciente {n} Imagem {m}: {st.session_state.ROIsDaImagem.size}")
+            histograma(img)
     if (st.session_state.ROIsDaImagem is not None):
         with col2:
-            
-            st.write(f"ROI: {st.session_state.ROIsDaImagem.size}")
-            st.image(st.session_state.ROIsDaImagem)
+            st.image(st.session_state.ROIsDaImagem, use_column_width=True)
             histograma(st.session_state.ROIsDaImagem)
