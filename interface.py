@@ -3,6 +3,8 @@ import scipy.io
 import numpy as np
 import io
 from PIL import Image
+#Nao testei o .mat ainda
+#PROBLEMA: UMA IMAGEM ESTA SOBREPONDO A OUTRA QUANDO CARREGADA
 def carregar_imagem_mat(arquivo_mat):
     # Carregar arquivo .mat
     mat_data = scipy.io.loadmat(arquivo_mat)
@@ -35,13 +37,22 @@ arquivo = st.sidebar.file_uploader("Carregar uma imagem", type=["mat", "jpeg", "
 
 #aqui é onde vamos receber as imagens (esta no sidebar)
 if arquivo:
+    imagem= None
     # Verifica o tipo de arquivo
-    if arquivo.type == "image/jpeg" or arquivo.type == "image/png":
+    if arquivo.type in ["image/jpeg", "image/png"]:
         imagem = Image.open(arquivo)
-        st.sidebar.image(imagem, caption="Imagem Carregada", width=150)
+        imagem_url = st.sidebar.image(imagem, caption="Imagem Carregada", width=150)
     elif arquivo.type == "application/octet-stream":  # Para arquivos .mat
         imagem = carregar_imagem_mat(arquivo)
-        st.sidebar.image(imagem, caption="Imagem Carregada (MAT)", width=150)
+        imagem_url = st.sidebar.image(imagem, caption="Imagem Carregada (MAT)", width=150)
+
+    if imagem:
+        nome_pasta = f"Pasta {len(pastas) + 1}"
+        if nome_pasta not in pastas:
+            pastas[nome_pasta] = []
+        if imagem not in pastas[nome_pasta]:
+            pastas[nome_pasta].append(imagem)
+            
 
 imagem_selecionada = None
 #para cada pasta no dicionario(paciente), cria um expande(printar no sidebar)
@@ -49,9 +60,15 @@ for nome_pasta, fotos in pastas.items():
     with st.sidebar.expander(nome_pasta):
         st.write(f"Fotos da {nome_pasta}:")
         # Para cada foto dentro da pasta, exibe a imagem
-        for foto in fotos:
-            if st.button(f"Selecionar {foto}", key=foto):
-                imagem_selecionada = foto
+        for i, foto in enumerate(fotos):
+            if isinstance(foto, Image.Image):  # Se for objeto Image
+                st.image(foto, width=100)
+                if st.button(f"Selecionar Foto {i+1} de {nome_pasta}", key=f"botao_{nome_pasta}_{i}"):
+                    imagem_selecionada = foto
+            else:  # Se for URL
+                st.image(foto, width=100)
+                if st.button(f"Selecionar {foto}", key=foto):
+                    imagem_selecionada = foto
 
 if imagem_selecionada:
     st.write("Imagem selecionada:")
