@@ -11,45 +11,17 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 
-
-
-
-
-
-
-
 st.set_page_config(layout="wide")
-
-
-
-
-# do ipynb do canvas:
-## carregar dados
-#data = scipy.io.loadmat(path_data)
-# é um dicionário, 'data' contém as imagens
-# data.keys()
-# accessar as imagen de 'data'
-#data_array = data['data']
-#images = data_array['images']
-# Acesso à imagem m do paciente n
-# n varia de 0 a 54, m de 0 a 9
-#n=1
-#m=5
-#imagem = images[0][n][m]
-#print(imagem.shape)
-## plotar a imagem
-#plt.figure(figsize=(9,9))
-#plt.imshow(first_image, cmap='gray')  # Use 'gray' for grayscale images
-#plt.axis('off')  # Hide axes for better visualization
-#plt.show()
 
 
 # st.title("Trabalho PAI")
 mainTab, verROITab = st.tabs(["Imagem & Cortar ROI", "Ver ROIs"])
 mainContainer = mainTab.container()
 
-if "ROIsDaImagem" not in st.session_state:
-    st.session_state.ROIsDaImagem = None 
+if "ROIsSalvos" not in st.session_state:
+    st.session_state.ROIsSalvos = []
+if "ROIDaImagem" not in st.session_state:
+    st.session_state.ROIDaImagem = None 
 if "imagemEscolhida" not in st.session_state:
     st.session_state.imagemEscolhida = None
 if "imagensVariadas" not in st.session_state:
@@ -80,14 +52,10 @@ def carregar_arquivo_mat(caminho_arquivo):
     except Exception as e:
         print(f"Erro ao carregar o arquivo: {e}")
 
-if "arquivo_mat_carregado" not in st.session_state:
-    # Carregar o arquivo .mat apenas uma vez
-    carregar_arquivo_mat("./base/dataset_liver_bmodes_steatosis_assessment_IJCARS.mat")
-    st.session_state.arquivo_mat_carregado = True  # Marcar como carregado
 
 # Upload de arquivo no topo do sidebar
-st.sidebar.title("Adicionar Foto")
-arquivo = st.sidebar.file_uploader("Carregar uma imagem", type=["mat", "jpeg", "jpg", "png"])
+arquivo = st.sidebar.file_uploader("", type=["mat", "jpeg", "jpg", "png"])
+carregar_arquivo_mat("./base/dataset_liver_bmodes_steatosis_assessment_IJCARS.mat")
 
 if arquivo and arquivo.name not in [nome for nome, _  in st.session_state.imagensVariadas]:
     imagem= None
@@ -124,15 +92,23 @@ with mainContainer:
         m = st.session_state.imagemEscolhida[2]
         with col1:
             cropped_img = st_cropper(Image.fromarray(img), realtime_update=True, box_color='#90ee90', aspect_ratio=(20,20))
-            st.session_state.ROIsDaImagem = cropped_img;
+            st.session_state.ROIDaImagem = cropped_img;
             insideC1, insideC2 = st.columns(2)
             with insideC1:
-                st.button('Salvar ROI')
+                if (st.button('Salvar ROI')):
+                    # Salvar a ROI em session_state, guardando n e m
+                    st.session_state.ROIsSalvos.append((st.session_state.ROIDaImagem, n, m))
             with insideC2:
                 if (n is not None):
-                    st.write(f"ROI Paciente {n} Imagem {m}: {st.session_state.ROIsDaImagem.size}")
+                    st.write(f"ROI Paciente {n} Imagem {m}: {st.session_state.ROIDaImagem.size}")
             histograma(img)
-    if (st.session_state.ROIsDaImagem is not None):
+    if (st.session_state.ROIDaImagem is not None):
         with col2:
-            st.image(st.session_state.ROIsDaImagem, use_column_width=True)
-            histograma(st.session_state.ROIsDaImagem)
+            st.image(st.session_state.ROIDaImagem, use_column_width=True)
+            histograma(st.session_state.ROIDaImagem)
+        
+with verROITab:
+    for roi, n, m in st.session_state.ROIsSalvos:
+        st.write(f"ROI Paciente {n} Imagem {m}: {roi.size}")
+        st.image(roi, use_column_width=True)
+        histograma(roi)
