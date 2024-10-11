@@ -57,6 +57,7 @@ def carregar_arquivo_mat(caminho_arquivo):
 arquivo = st.sidebar.file_uploader("", type=["mat", "jpeg", "jpg", "png"])
 carregar_arquivo_mat("./base/dataset_liver_bmodes_steatosis_assessment_IJCARS.mat")
 
+# Se o arquivo existir e o nome dele ja nao estiver na lista de imagens variadas
 if arquivo and arquivo.name not in [nome for nome, _  in st.session_state.imagensVariadas]:
     imagem= None
     # Verifica o tipo de arquivo
@@ -84,6 +85,7 @@ with st.sidebar.expander('Imagens diversas'):
 
 with mainContainer:
     c1, c2 = st.columns(2);
+    c3, c4 = st.columns(2)
     col1 = c1.container();
     col2 = c2.container();
     if (st.session_state.imagemEscolhida is not None):
@@ -101,10 +103,12 @@ with mainContainer:
             with insideC2:
                 if (n is not None):
                     st.write(f"ROI Paciente {n} Imagem {m}: {st.session_state.ROIDaImagem.size}")
+        with c3:
             histograma(img)
     if (st.session_state.ROIDaImagem is not None):
         with col2:
             st.image(st.session_state.ROIDaImagem, use_column_width=True)
+        with c4:
             histograma(st.session_state.ROIDaImagem)
         
 with verROITab:
