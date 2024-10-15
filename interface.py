@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
 from streamlit_image_zoom import image_zoom
-
+import glcm as gl
 
 
 
@@ -84,36 +84,7 @@ def histograma(imagem):
     plt.ylabel('Número de pixels')
     st.pyplot(plt)
     plt.clf()
-    print("Matriz GLCM calculada: \n", glcm(imagem, [1],[0]))
-
-def glcm(image, distances, angles, gray_levels=256):
-    print("gray levels:", )
-    #Inicializa a matriz GLCM com zeros e ja definindo as dimensões(quantidade de tons)
-    glcm = np.zeros((gray_levels, gray_levels, len(distances), len(angles)), dtype=np.uint8)
-    #Recebendo o tamanho da imagem
-    image_np = np.array(image)
-    rows,cols = image_np.shape
-
-    for d_idx, distance in enumerate(distances):
-        for a_idx, angle in enumerate(angles):
-            # Calcula os deslocamentos
-            dx = int(np.round(np.cos(angle) * distance))
-            dy = int(np.round(np.sin(angle) * distance))
-            
-            # Percorre a imagem para calcular pares de intensidades
-            for i in range(rows):
-                for j in range(cols):
-                    row_offset = i + dy
-                    col_offset = j + dx
-
-                    if (0 <= row_offset < rows) and (0 <= col_offset < cols):
-                        intensity_current = image_np[i, j]
-                        intensity_neighbor = image_np[row_offset, col_offset]
-                        
-                        glcm[intensity_current, intensity_neighbor, d_idx, a_idx] += 1
-
-
-    #return glcm
+    gl.glcm(imagem, [1],[0])
 
 with st.sidebar.expander('Imagens diversas'):
     for nome, img in st.session_state.imagensVariadas:
