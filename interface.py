@@ -112,16 +112,8 @@ def glcm(image, distances, angles, gray_levels=256):
                         
                         glcm[intensity_current, intensity_neighbor, d_idx, a_idx] += 1
 
-    plot_glcm(glcm)
-    return glcm
-    
-def plot_glcm(glcm_matrix):
-    plt.imshow(glcm_matrix[:, :, 0, 0], cmap='gray', interpolation='nearest')
-    plt.title('GLCM - Matriz de Co-ocorrência')
-    plt.xlabel('Nível de Cinza - Vizinhança')
-    plt.ylabel('Nível de Cinza - Referência')
-    plt.colorbar()
-    st.pyplot(plt)
+
+    #return glcm
 
 with st.sidebar.expander('Imagens diversas'):
     for nome, img in st.session_state.imagensVariadas:
