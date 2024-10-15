@@ -28,6 +28,11 @@ if "imagemEscolhida" not in st.session_state:
 if "imagensVariadas" not in st.session_state:
     st.session_state.imagensVariadas = []
 
+def gerar_id_unico(offset=0):
+    if 'ultimo_id' not in st.session_state:
+        st.session_state['ultimo_id'] = 0
+    st.session_state['ultimo_id'] += 1
+    return st.session_state['ultimo_id'] + offset
 
 def escolherImagem(imagem, n,m):
     if not isinstance(imagem, np.ndarray):
@@ -100,7 +105,7 @@ with mainContainer:
             with insideC1:
                 if (st.button('Salvar ROI')):
                     # Salvar a ROI em session_state, guardando n e m
-                    st.session_state.ROIsSalvos.append((st.session_state.ROIDaImagem, n, m))
+                    st.session_state.ROIsSalvos.append((st.session_state.ROIDaImagem, n, m, gerar_id_unico()))
             with insideC2:
                 if (n is not None):
                     st.write(f"ROI Paciente {n} Imagem {m}: {st.session_state.ROIDaImagem.size}")
@@ -113,14 +118,41 @@ with mainContainer:
             histograma(st.session_state.ROIDaImagem)
         
 
+def calcular_hi(roi_figado, roi_rim):
+    media_figado = np.mean(roi_figado)
+    media_rim = np.mean(roi_rim)
+    hi = media_figado / media_rim
+    return hi
+
+def normalizar_figado(roi_figado, hi):
+    # multpalica os valores de pixel pelo HI e dpois arredonda
+    roi_normalizada = np.clip(np.round(roi_figado * hi), 0, 255).astype(np.uint8)
+    return roi_normalizada
+
+
 with verROITab:
-    c1,c2,c3 = st.columns(3);
+    mainc1, mainc2, mainc3 = st.columns(3)
     i = 0;
-    for roi, n, m in st.session_state.ROIsSalvos:
+    # selecione figado entre ROIsSalvos
+    figado = mainc1.selectbox("Selecione o figado", [f"{id}" for roi, n, m, id in st.session_state.ROIsSalvos], key="figado")
+    # selecionar rim
+    rim = mainc2.selectbox("Selecione o rim", [f"{id}" for roi, n, m, id in st.session_state.ROIsSalvos], key="rim")
+
+    if (mainc1.button("Processar")):
+        # achar ROIsalvo por ID
+        figadoROI = [(roi, n,m, id) for roi, n, m, id in st.session_state.ROIsSalvos if str(id) == figado][0]
+        rimROI = [(roi, n,m, id) for roi, n, m, id in st.session_state.ROIsSalvos if str(id) == rim][0]
+        hi = calcular_hi(figadoROI[0], rimROI[0])
+        roi_figado_normalizada = normalizar_figado(figadoROI[0], hi)
+        st.session_state.ROIsSalvos.append((roi_figado_normalizada, figadoROI[1], figadoROI[2], gerar_id_unico(1000)))
+
+
+    c1,c2,c3 = st.columns(3);
+    for roi, n, m, id in st.session_state.ROIsSalvos:
         colatual = c1 if i % 3 == 0 else c2 if i % 3 == 1 else c3
         i += 1
         with colatual:
-            st.write(f"ROI Paciente {n} Imagem {m}: {roi.size}")
+            st.write(f"ROI Paciente {n} Imagem {m} ID {id}: {roi.size}")
             image_zoom(roi, size=(420, 420))
             # st.image(roi, use_column_width=True)
             histograma(roi)
