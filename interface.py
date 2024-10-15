@@ -6,9 +6,10 @@ from random import randint
 import scipy.io
 from streamlit_cropper import st_cropper
 import numpy as np
-import io
 import matplotlib.pyplot as plt
 from PIL import Image
+from streamlit_image_zoom import image_zoom
+
 
 
 st.set_page_config(layout="wide")
@@ -111,8 +112,15 @@ with mainContainer:
         with c4:
             histograma(st.session_state.ROIDaImagem)
         
+
 with verROITab:
+    c1,c2,c3 = st.columns(3);
+    i = 0;
     for roi, n, m in st.session_state.ROIsSalvos:
-        st.write(f"ROI Paciente {n} Imagem {m}: {roi.size}")
-        st.image(roi, use_column_width=True)
-        histograma(roi)
+        colatual = c1 if i % 3 == 0 else c2 if i % 3 == 1 else c3
+        i += 1
+        with colatual:
+            st.write(f"ROI Paciente {n} Imagem {m}: {roi.size}")
+            image_zoom(roi, size=(420, 420))
+            # st.image(roi, use_column_width=True)
+            histograma(roi)
