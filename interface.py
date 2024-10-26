@@ -3,7 +3,7 @@
 #Gustavo Lorenzo: 782633
 #Vinicius Augusto: 767998
 # Como rodar:
-# pip install streamlit, streamlit-cropper scipy, numpy, matplotlib, opencv-python
+# pip install streamlit streamlit-cropper scipy numpy matplotlib setuptools opencv-python streamlit_image_zoom scikit-image 
 # streamlit run interface.py
 import streamlit as st
 from random import randint
