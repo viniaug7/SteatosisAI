@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from streamlit_image_zoom import image_zoom
 import glcm as gl
+import cv2
 
 
 
@@ -62,6 +63,7 @@ def carregar_arquivo_mat(caminho_arquivo):
 
 # Upload de arquivo no topo do sidebar
 arquivo = st.sidebar.file_uploader("", type=["mat", "jpeg", "jpg", "png"])
+    
 carregar_arquivo_mat("./base/dataset_liver_bmodes_steatosis_assessment_IJCARS.mat")
 
 # Se o arquivo existir e o nome dele ja nao estiver na lista de imagens variadas
@@ -84,6 +86,8 @@ def histograma(imagem):
     plt.ylabel('Número de pixels')
     st.pyplot(plt)
     plt.clf()
+    if len(image_array.shape) == 3 and image_array.shape[2] == 3:
+            imagem = cv2.cvtColor(image_array, cv2.COLOR_BGR2GRAY)
     gl.glcm(imagem, [1,2,4,8])
 
 with st.sidebar.expander('Imagens diversas'):
