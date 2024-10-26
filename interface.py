@@ -84,7 +84,7 @@ def histograma(imagem):
     plt.ylabel('Número de pixels')
     st.pyplot(plt)
     plt.clf()
-    gl.glcm(imagem, [1],[0])
+    gl.glcm(imagem, [1,2,4,8])
 
 with st.sidebar.expander('Imagens diversas'):
     for nome, img in st.session_state.imagensVariadas:
