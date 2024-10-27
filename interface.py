@@ -13,7 +13,6 @@ import glcm as gl
 import cv2
 
 
-
 st.set_page_config(layout="wide")
 
 
@@ -30,16 +29,22 @@ if "imagemEscolhida" not in st.session_state:
 if "imagensVariadas" not in st.session_state:
     st.session_state.imagensVariadas = []
 
+@st.cache_data
 def gerar_id_unico(offset=0):
     if 'ultimo_id' not in st.session_state:
         st.session_state['ultimo_id'] = 0
     st.session_state['ultimo_id'] += 1
     return st.session_state['ultimo_id'] + offset
 
+@st.cache_data
 def escolherImagem(imagem, n,m):
     if not isinstance(imagem, np.ndarray):
         imagem = np.array(imagem)
     st.session_state.imagemEscolhida = (imagem, n, m)
+
+@st.cache_data
+def carregar_imagem(upload):
+    return Image.open(upload)
 
 def transformar_imagens_mat_em_botoes_na_sidebar(arquivo_mat):
     # Carregar arquivo .mat
@@ -50,20 +55,23 @@ def transformar_imagens_mat_em_botoes_na_sidebar(arquivo_mat):
         with st.sidebar.expander(f"Paciente {n}"):
             for m in range(10):
                 imagem = images[0][n][m]
-                btn = st.button(f"Imagem {m} do Paciente {n}", key=f"botao_{n}_{m}", use_container_width=True, on_click=escolherImagem, args=[imagem, n,m]) 
+                st.button(f"Imagem {m} do Paciente {n}", key=f"botao_{n}_{m}", use_container_width=True, on_click=escolherImagem, args=[imagem, n,m]) 
+
 
 def carregar_arquivo_mat(caminho_arquivo):
     try:
         transformar_imagens_mat_em_botoes_na_sidebar(caminho_arquivo)
     except FileNotFoundError:
-        print(f"Arquivo {caminho_arquivo} não encontrado.")
+        st.error(f"Arquivo {caminho_arquivo} não encontrado.")
     except Exception as e:
-        print(f"Erro ao carregar o arquivo: {e}")
+        st.error(f"Erro ao carregar o arquivo: {e}")
 
 
 # Upload de arquivo no topo do sidebar
+
 arquivo = st.sidebar.file_uploader("", type=["mat", "jpeg", "jpg", "png"])
-    
+
+   
 carregar_arquivo_mat("./base/dataset_liver_bmodes_steatosis_assessment_IJCARS.mat")
 
 # Se o arquivo existir e o nome dele ja nao estiver na lista de imagens variadas
@@ -71,23 +79,34 @@ if arquivo and arquivo.name not in [nome for nome, _  in st.session_state.imagen
     imagem= None
     # Verifica o tipo de arquivo
     if arquivo.type in ["image/jpeg", "image/png"]:
-        imagem = Image.open(arquivo)
+        imagem = carregar_imagem(arquivo)
         st.session_state.imagensVariadas.append((arquivo.name, imagem))
 
     elif arquivo.type == "application/octet-stream":  # Para arquivos .mat
         transformar_imagens_mat_em_botoes_na_sidebar(arquivo)
             
-
+@st.cache_data
 def histograma(imagem):
     image_array = np.array(imagem)
+    if len(image_array.shape) == 3 and image_array.shape[2] == 3:
+            imagem = cv2.cvtColor(image_array, cv2.COLOR_BGR2GRAY)
     plt.hist(image_array.flatten(), bins=256, range=(0, 256), color='black')
-    plt.title('Histograma em Escala de Cinza')
+    plt.title('Histograma em Escala de Cinza da Imagem')
     plt.xlabel('Intensidade de pixel')
     plt.ylabel('Número de pixels')
     st.pyplot(plt)
     plt.clf()
-    if len(image_array.shape) == 3 and image_array.shape[2] == 3:
-            imagem = cv2.cvtColor(image_array, cv2.COLOR_BGR2GRAY)
+    
+@st.cache_data
+def histograma_roi(imagem):
+    image_array = np.array(imagem)
+    plt.hist(image_array.flatten(), bins=256, range=(0, 256), color='black')
+    plt.title('Histograma em Escala de Cinza da ROI')
+    plt.xlabel('Intensidade de pixel')
+    plt.ylabel('Número de pixels')
+    st.pyplot(plt)
+    plt.clf()
+    
     gl.glcm(imagem, [1,2,4,8])
 
 with st.sidebar.expander('Imagens diversas'):
@@ -119,16 +138,16 @@ with mainContainer:
     if (st.session_state.ROIDaImagem is not None):
         with col2:
             st.image(st.session_state.ROIDaImagem, use_column_width=True)
-        with c4:
-            histograma(st.session_state.ROIDaImagem)
         
-
+        
+@st.cache_data
 def calcular_hi(roi_figado, roi_rim):
     media_figado = np.mean(roi_figado)
     media_rim = np.mean(roi_rim)
     hi = media_figado / media_rim
     return hi
 
+@st.cache_data
 def normalizar_figado(roi_figado, hi):
     # multpalica os valores de pixel pelo HI e dpois arredonda
     roi_normalizada = np.clip(np.round(roi_figado * hi), 0, 255).astype(np.uint8)
@@ -160,4 +179,6 @@ with verROITab:
             st.write(f"ROI Paciente {n} Imagem {m} ID {id}: {roi.size}")
             image_zoom(roi, size=(420, 420))
             # st.image(roi, use_column_width=True)
-            histograma(roi)
+            histograma_roi(roi)
+            #---------------------------------------------------------------------------------------------------------
+            #colocar para aparecer as variaveis: escolher como aparecer
