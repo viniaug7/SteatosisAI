@@ -24,7 +24,7 @@ if not os.path.isfile(CSV_FILENAME):
     with open(CSV_FILENAME, 'w') as f:
         f.write('n,m\n')  # Write header for the CSV file
 
-def salvarROIEmCSVePasta(imagemFigado, n, m, coordsFigado, coordsRim): 
+def salvarROIEmCSVePasta(imagemFigado, n, m, coordsFigado, coordsRim, HI): 
     nFormatado = str(n).zfill(2)
     mFormatado = str(m)
     nomeDoArquivo = f'ROI_{nFormatado}_{mFormatado}.jpg'
@@ -43,7 +43,7 @@ def salvarROIEmCSVePasta(imagemFigado, n, m, coordsFigado, coordsRim):
     if os.path.isfile(CSV_FILENAME):
         roi_data = pd.read_csv(CSV_FILENAME)
     else:
-        roi_data = pd.DataFrame(columns=['nome_arquivo', 'classe', 'coords_figado', 'coords_rim', 'H'])
+        roi_data = pd.DataFrame(columns=['nome_arquivo', 'classe', 'coords_figado', 'coords_rim', 'HI'])
 
     # Verificar se a combinação de n e m já existe
     ja_existe = roi_data[(roi_data['n'] == n) & (roi_data['m'] == m)]
@@ -52,7 +52,7 @@ def salvarROIEmCSVePasta(imagemFigado, n, m, coordsFigado, coordsRim):
         # Atualizar os dados existentes
         roi_data.loc[ja_existe.index, 'coords_figado'] = coordsFigadoASalvar
         roi_data.loc[ja_existe.index, 'coords_rim'] = coordsRimASalvar
-        roi_data.loc[ja_existe.index, 'H'] = 'awefawef' 
+        roi_data.loc[ja_existe.index, 'HI'] = HI
     else:
         # Adicionar nova entrada
         nova = pd.DataFrame({
@@ -60,7 +60,7 @@ def salvarROIEmCSVePasta(imagemFigado, n, m, coordsFigado, coordsRim):
             'classe': [classe],
             'coords_figado': [coordsFigadoASalvar],
             'coords_rim': [coordsRimASalvar],
-            'H': [],
+            'HI': [HI],
             'n': [n],
             'm': [m]
         })
@@ -74,7 +74,7 @@ st.set_page_config(layout="wide")
 
 
 # st.title("Trabalho PAI")
-mainTab, verROITab = st.tabs(["Imagem & Cortar ROI", "Ver ROIs"])
+mainTab, verROITab, classificarTab  = st.tabs(["Imagem & Cortar ROI", "Ver ROIs", "Classificar"])
 mainContainer = mainTab.container()
 
 if "ROIsSalvos" not in st.session_state:
@@ -275,7 +275,7 @@ with mainContainer:
                 if (n is not None):
                     w = st.session_state.ROIDaImagem.size[0]
                     h = st.session_state.ROIDaImagem.size[1]
-                    st.write(f"ROI Paciente {n} Imagem {m}: ({w+1}x{h+1})")
+                    st.write(f"ROI Paciente {n} Imagem {m}: ({w}x{h})")
         with c3:
             histograma(img)
     if (st.session_state.ROIDaImagem is not None):
@@ -310,7 +310,7 @@ with verROITab:
         hi = calcular_hi(figadoROI[0], rimROI[0])
         roi_figado_normalizada = normalizar_figado(figadoROI[0], hi)
         st.session_state.ROIsSalvos.append((roi_figado_normalizada, figadoROI[1], figadoROI[2], gerar_id_unico(1000), figadoROI[3]))
-        salvarROIEmCSVePasta(figadoROI[0], figadoROI[1], figadoROI[2], figadoROI[4], rimROI[4] )
+        salvarROIEmCSVePasta(figadoROI[0], figadoROI[1], figadoROI[2], figadoROI[4], rimROI[4], hi)
 
 
     c1,c2,c3 = st.columns(3);
@@ -323,8 +323,8 @@ with verROITab:
                 w = 28
                 h = 28
             else:  # Assume que roi.size é uma tupla
-                w = roi.size[0] + 1
-                h = roi.size[1] + 1
+                w = roi.size[0]
+                h = roi.size[1]
             
             with thiscont:
                 st.write(f"ROI Paciente {n} Imagem {m} ID {id}: {w}x{h}")
