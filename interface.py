@@ -14,8 +14,60 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from streamlit_image_zoom import image_zoom
 from skimage.feature import graycomatrix, graycoprops
+import pandas as pd
 import cv2
+import os
 #from scipy.stats import entropy opcional, escolher qual processa mais rapido a entropia -> fiz na mão
+
+CSV_FILENAME = 'dados_das_rois.csv'
+if not os.path.isfile(CSV_FILENAME):
+    with open(CSV_FILENAME, 'w') as f:
+        f.write('n,m\n')  # Write header for the CSV file
+
+def salvarROIEmCSVePasta(imagemFigado, n, m, coordsFigado, coordsRim): 
+    nFormatado = str(n).zfill(2)
+    mFormatado = str(m)
+    nomeDoArquivo = f'ROI_{nFormatado}_{mFormatado}.jpg'
+    imagemFigado.save(nomeDoArquivo)
+
+    coordsFigadoASalvar = f"{coordsFigado['left']}-{coordsFigado['top']}"
+    coordsRimASalvar = f"{coordsRim['left']}-{coordsRim['top']}"
+    
+    # Determinar a classe do paciente
+    if n <= 16:
+        classe = 'saudavel'
+    else:
+        classe = 'esteatose'
+
+    # Criar ou carregar o DataFrame
+    if os.path.isfile(CSV_FILENAME):
+        roi_data = pd.read_csv(CSV_FILENAME)
+    else:
+        roi_data = pd.DataFrame(columns=['nome_arquivo', 'classe', 'coords_figado', 'coords_rim', 'H'])
+
+    # Verificar se a combinação de n e m já existe
+    ja_existe = roi_data[(roi_data['n'] == n) & (roi_data['m'] == m)]
+    
+    if not ja_existe.empty:
+        # Atualizar os dados existentes
+        roi_data.loc[ja_existe.index, 'coords_figado'] = coordsFigadoASalvar
+        roi_data.loc[ja_existe.index, 'coords_rim'] = coordsRimASalvar
+        roi_data.loc[ja_existe.index, 'H'] = 'awefawef' 
+    else:
+        # Adicionar nova entrada
+        nova = pd.DataFrame({
+            'nome_arquivo': [nomeDoArquivo],
+            'classe': [classe],
+            'coords_figado': [coordsFigadoASalvar],
+            'coords_rim': [coordsRimASalvar],
+            'H': [],
+            'n': [n],
+            'm': [m]
+        })
+        roi_data = pd.concat([roi_data, nova], ignore_index=True)
+
+    # Salvar o DataFrame de volta no CSV
+    roi_data.to_csv(CSV_FILENAME, index=False)
 
 
 st.set_page_config(layout="wide")
@@ -155,7 +207,6 @@ def glcm(image, distances, gray_levels=256, symmetric=True, normed=True):
             for i, hu_moment in enumerate(hu_moments, 1):
                 print(f"Hu[{i}]: {hu_moment}")
     return glcm
-
 #precisa ter dois codigos de histograma para que o @st.cache_data funcione de acordo        
 #e evite o processamento constante da imagem selecionada a cada iteracao
 @st.cache_data
@@ -189,7 +240,8 @@ with st.sidebar.expander('Imagens diversas'):
 
 def makeBox(Pil_imagem, aspect_ratio): 
     width, height = Pil_imagem.size
-    b_width = 27 # aparentemente os 1 pixeis de borda do proprio quadrfado n contam dpoies que mexe uma vez???
+    # No final da 28 28, deve ser largura da box
+    b_width = 27
     b_height = 27
     left = (width - b_width) // 2
     top = (height - b_height) // 2
@@ -207,16 +259,23 @@ with mainContainer:
         n = st.session_state.imagemEscolhida[1]
         m = st.session_state.imagemEscolhida[2]
         with col1:
-            cropped_img = st_cropper(Image.fromarray(img), stroke_width=1, key=f'cropper_{n}_{m}', box_algorithm=makeBox, realtime_update=True, box_color='#90ee90', aspect_ratio=(20,20))
+
+            aTupla = st_cropper(Image.fromarray(img), return_type='both', stroke_width=1, key=f'cropper_{n}_{m}', box_algorithm=makeBox, realtime_update=True, box_color='#90ee90', aspect_ratio=(20,20)) 
+            cropped_img  = aTupla[0]
+            cropped_img_box_coords = aTupla[1]
+            print(cropped_img_box_coords)
             st.session_state.ROIDaImagem = cropped_img;
             insideC1, insideC2 = st.columns(2)
             with insideC1:
                 if (st.button('Salvar ROI')):
                     # Salvar a ROI em session_state, guardando n e m
-                    st.session_state.ROIsSalvos.append((st.session_state.ROIDaImagem, n, m, gerar_id_unico()))
+                    st.session_state.ROIsSalvos.append((st.session_state.ROIDaImagem, n, m, gerar_id_unico(), cropped_img_box_coords))
+                    st.success('ROI Salvo com sucesso')
             with insideC2:
                 if (n is not None):
-                    st.write(f"ROI Paciente {n} Imagem {m}: {st.session_state.ROIDaImagem.size}")
+                    w = st.session_state.ROIDaImagem.size[0]
+                    h = st.session_state.ROIDaImagem.size[1]
+                    st.write(f"ROI Paciente {n} Imagem {m}: ({w+1}x{h+1})")
         with c3:
             histograma(img)
     if (st.session_state.ROIDaImagem is not None):
@@ -224,14 +283,12 @@ with mainContainer:
             st.image(st.session_state.ROIDaImagem, use_column_width=True)
         
         
-@st.cache_data
 def calcular_hi(roi_figado, roi_rim):
     media_figado = np.mean(roi_figado)
     media_rim = np.mean(roi_rim)
     hi = media_figado / media_rim
     return hi
 
-@st.cache_data
 def normalizar_figado(roi_figado, hi):
     # multpalica os valores de pixel pelo HI e dpois arredonda
     roi_normalizada = np.clip(np.round(roi_figado * hi), 0, 255).astype(np.uint8)
@@ -242,27 +299,36 @@ with verROITab:
     mainc1, mainc2, mainc3 = st.columns(3)
     i = 0;
     # selecione figado entre ROIsSalvos
-    figado = mainc1.selectbox("Selecione o figado", [f"{id}" for roi, n, m, id in st.session_state.ROIsSalvos], key="figado")
+    figado = mainc1.selectbox("Selecione o figado", [f"{id}" for roi, n, m, id, coords in st.session_state.ROIsSalvos], key="figado")
     # selecionar rim
-    rim = mainc2.selectbox("Selecione o rim", [f"{id}" for roi, n, m, id in st.session_state.ROIsSalvos], key="rim")
+    rim = mainc2.selectbox("Selecione o rim", [f"{id}" for roi, n, m, id, coords in st.session_state.ROIsSalvos], key="rim")
 
-    if (mainc1.button("Processar")):
+    if (mainc1.button("Normalizar figado e Salvar")):
         # achar ROIsalvo por ID
-        figadoROI = [(roi, n,m, id) for roi, n, m, id in st.session_state.ROIsSalvos if str(id) == figado][0]
-        rimROI = [(roi, n,m, id) for roi, n, m, id in st.session_state.ROIsSalvos if str(id) == rim][0]
+        figadoROI = [(roi, n,m, id, coords) for roi, n, m, id, coords in st.session_state.ROIsSalvos if str(id) == figado][0]
+        rimROI = [(roi, n,m, id, coords) for roi, n, m, id, coords in st.session_state.ROIsSalvos if str(id) == rim][0]
         hi = calcular_hi(figadoROI[0], rimROI[0])
         roi_figado_normalizada = normalizar_figado(figadoROI[0], hi)
-        st.session_state.ROIsSalvos.append((roi_figado_normalizada, figadoROI[1], figadoROI[2], gerar_id_unico(1000)))
+        st.session_state.ROIsSalvos.append((roi_figado_normalizada, figadoROI[1], figadoROI[2], gerar_id_unico(1000), figadoROI[3]))
+        salvarROIEmCSVePasta(figadoROI[0], figadoROI[1], figadoROI[2], figadoROI[4], rimROI[4] )
 
 
     c1,c2,c3 = st.columns(3);
-    for roi, n, m, id in st.session_state.ROIsSalvos:
+    for roi, n, m, id, coords in st.session_state.ROIsSalvos:
         colatual = c1 if i % 3 == 0 else c2 if i % 3 == 1 else c3
         i += 1
         with colatual:
-            st.write(f"ROI Paciente {n} Imagem {m} ID {id}: {roi.size}")
-            image_zoom(roi, size=(420, 420))
-            # st.image(roi, use_column_width=True)
-            histograma_roi(roi)
+            thiscont = st.container(key=f'{n}_{m}_{id}_{roi.size}')
+            if isinstance(roi.size, int):
+                w = 28
+                h = 28
+            else:  # Assume que roi.size é uma tupla
+                w = roi.size[0] + 1
+                h = roi.size[1] + 1
+            
+            with thiscont:
+                st.write(f"ROI Paciente {n} Imagem {m} ID {id}: {w}x{h}")
+                image_zoom(roi, size=(420, 420))
+                histograma_roi(roi)
             #---------------------------------------------------------------------------------------------------------
             #colocar para aparecer as variaveis: escolher como aparecer
