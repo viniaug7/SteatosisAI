@@ -1,5 +1,5 @@
 # Como rodar:
-# pip install streamlit, streamlit-cropper scipy, numpy, matplotlib
+# pip install streamlit, streamlit-cropper scipy, numpy, matplotlib, opencv-python
 # streamlit run interface.py
 #NT:(2322434)mod4 = 2  ->  Momentos invariantes de Hu, se NT=2
 #Eric Miranda: 771803

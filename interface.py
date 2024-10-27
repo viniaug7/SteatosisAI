@@ -1,5 +1,5 @@
 # Como rodar:
-# pip install streamlit, streamlit-cropper scipy, numpy, matplotlib
+# pip install streamlit, streamlit-cropper scipy, numpy, matplotlib, opencv-python
 # streamlit run interface.py
 import streamlit as st
 from random import randint
