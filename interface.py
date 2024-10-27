@@ -169,44 +169,46 @@ def circular_offsets(distance):
 
 @st.cache_data
 def glcm(image, distances, gray_levels=256, symmetric=True, normed=True):
+    results = []  # Lista para armazenar resultados
     for distance in distances:
-            image = np.copy(image)
+        image_copy = np.copy(image)
 
-            # obter deslocamentos circulares para a distância atual(reza para estar certo -> nos meus calculos deu certo *u* )
-            
-            #Deslocamento Circular
-            angles = circular_offsets(distance)
-            #GLCM
-            glcm = graycomatrix(image, [distance], angles, gray_levels, symmetric, normed)
+        # Obter deslocamentos circulares para a distância atual
+        angles = circular_offsets(distance)
+        
+        # GLCM
+        glcm = graycomatrix(image_copy, [distance], angles, gray_levels, symmetric, normed)
 
-            #Homogeneidade
-            homogeneity = graycoprops(glcm, 'homogeneity')[0, 0]
-            print(f"Homogeneidade para distancia: {distance}=: {homogeneity}")
+        # Homogeneidade
+        homogeneity = graycoprops(glcm, 'homogeneity')[0, 0]
+        
+        # Entropia
+        glcm_probabilities = glcm / glcm.sum()
+        glcm_probabilities_flat = glcm_probabilities.flatten()
+        glcm_probabilities_flat = glcm_probabilities_flat[glcm_probabilities_flat > 0]
+        glcm_entropy = -np.sum(glcm_probabilities_flat * np.log2(glcm_probabilities_flat))
 
-            # Entropia
-            glcm_probabilities = glcm / glcm.sum()
-            glcm_probabilities_flat = glcm_probabilities.flatten()
-            glcm_probabilities_flat = glcm_probabilities_flat[glcm_probabilities_flat > 0]
-            # Calculate Entropy using the formula: -∑ S(L, M) log2(S(L, M))
-            glcm_entropy = -np.sum(glcm_probabilities_flat * np.log2(glcm_probabilities_flat))# a funcao da biblioteca scipy.stats faria o mesmo calculo
-            #escolher qual custa menos tempo p processar
-            #caso mude, use essa linha de codigo: glcm_entropy = entropy(glcm_probabilities_flat, base=2)   #estou definindo a base 2 por ser entropia em bit
-            print(f"Entropia para distancia: {distance}= {glcm_entropy}")
+        # A cv2.moment aceita somente uma matriz de dimensão 2D, a glcm é 4D
+        glcm_2d = np.sum(glcm, axis=(2, 3))
+        
+        # Normalizar GLCM para ser uma imagem de intensidade
+        glcm_normalized = (glcm_2d / glcm_2d.max() * 255).astype(np.uint8)
 
-            #a cv2.moment aceita somente uma matriz de dimensao 2d, a glcm e 4d
-            glcm_2d = np.sum(glcm, axis=(2, 3))
-            # Momentos Invariantes de Hu
-            # Normalizar GLCM para ser uma imagem de intensidade
-            glcm_normalized = (glcm_2d  / glcm_2d.max() * 255).astype(np.uint8)
+        # Calcular momento invariante de Hu
+        moments = cv2.moments(glcm_normalized)
+        hu_moments = cv2.HuMoments(moments).flatten()
 
-            #Calcular momento invariante de Hu
-            moments = cv2.moments(glcm_normalized)
-            hu_moments = cv2.HuMoments(moments).flatten()
+        # Armazenar resultados em um dicionário
+        result = {
+            'distance': distance,
+            'homogeneity': homogeneity,
+            'entropy': glcm_entropy,
+            'hu_moments': hu_moments.tolist()  # Converter para lista para facilitar o retorno
+        }
+        results.append(result)  # Adicionar resultado à lista
 
-            print(f"Momentos Invariantes de Hu para distancia: {distance}:")
-            for i, hu_moment in enumerate(hu_moments, 1):
-                print(f"Hu[{i}]: {hu_moment}")
-    return glcm
+    return results  # Retornar todos os resultados
+
 #precisa ter dois codigos de histograma para que o @st.cache_data funcione de acordo        
 #e evite o processamento constante da imagem selecionada a cada iteracao
 @st.cache_data
@@ -231,7 +233,22 @@ def histograma_roi(imagem):
     st.pyplot(plt)
     plt.clf()
     
-    glcm(imagem, [1,2,4,8])
+    results = glcm(imagem, [1,2,4,8])
+    data_for_df = []
+    for result in results:
+        data_for_df.append({
+            'Distance': result['distance'],
+            'Homogeneity': result['homogeneity'],
+            'Entropy': result['entropy'],
+            'Hu Moments': result['hu_moments'] 
+        })
+
+    # Criação do DataFrame
+    results_df = pd.DataFrame(data_for_df)
+
+    # Exibir a tabela no Streamlit
+    st.write("Resultados GLCM:")
+    st.dataframe(results_df)
 
 with st.sidebar.expander('Imagens diversas'):
     for nome, img in st.session_state.imagensVariadas:
