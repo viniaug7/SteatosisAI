@@ -34,14 +34,12 @@ if "imagemEscolhida" not in st.session_state:
 if "imagensVariadas" not in st.session_state:
     st.session_state.imagensVariadas = []
 
-@st.cache_data
 def gerar_id_unico(offset=0):
     if 'ultimo_id' not in st.session_state:
         st.session_state['ultimo_id'] = 0
     st.session_state['ultimo_id'] += 1
     return st.session_state['ultimo_id'] + offset
 
-@st.cache_data
 def escolherImagem(imagem, n,m):
     if not isinstance(imagem, np.ndarray):
         imagem = np.array(imagem)
@@ -51,9 +49,14 @@ def escolherImagem(imagem, n,m):
 def carregar_imagem(upload):
     return Image.open(upload)
 
+@st.cache_data
+def loadMat(arquivo_mat):
+    return scipy.io.loadmat(arquivo_mat)
+
+
 def transformar_imagens_mat_em_botoes_na_sidebar(arquivo_mat):
     # Carregar arquivo .mat
-    data = scipy.io.loadmat(arquivo_mat)
+    data = loadMat(arquivo_mat)
     data_array = data["data"]
     images = data_array["images"]
     for n in range(55):
@@ -183,6 +186,17 @@ with st.sidebar.expander('Imagens diversas'):
     for nome, img in st.session_state.imagensVariadas:
         st.button(f"Imagem {nome}", key=f"botao_{randint(0, 9999999)}", on_click=escolherImagem, args=[img, None, None])
 
+
+def makeBox(Pil_imagem, aspect_ratio): 
+    width, height = Pil_imagem.size
+    b_width = 27 # aparentemente os 1 pixeis de borda do proprio quadrfado n contam dpoies que mexe uma vez???
+    b_height = 27
+    left = (width - b_width) // 2
+    top = (height - b_height) // 2
+    return { 'left': left, 'top': top, 'width': b_width, 'height': b_height }
+
+
+
 with mainContainer:
     c1, c2 = st.columns(2);
     c3, c4 = st.columns(2)
@@ -193,7 +207,7 @@ with mainContainer:
         n = st.session_state.imagemEscolhida[1]
         m = st.session_state.imagemEscolhida[2]
         with col1:
-            cropped_img = st_cropper(Image.fromarray(img), realtime_update=True, box_color='#90ee90', aspect_ratio=(20,20))
+            cropped_img = st_cropper(Image.fromarray(img), stroke_width=1, key=f'cropper_{n}_{m}', box_algorithm=makeBox, realtime_update=True, box_color='#90ee90', aspect_ratio=(20,20))
             st.session_state.ROIDaImagem = cropped_img;
             insideC1, insideC2 = st.columns(2)
             with insideC1:
