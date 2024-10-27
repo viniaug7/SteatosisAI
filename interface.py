@@ -84,7 +84,9 @@ if arquivo and arquivo.name not in [nome for nome, _  in st.session_state.imagen
 
     elif arquivo.type == "application/octet-stream":  # Para arquivos .mat
         transformar_imagens_mat_em_botoes_na_sidebar(arquivo)
-            
+
+#precisa ter dois codigos de histograma para que o @st.cache_data funcione de acordo        
+#e evite o processamento constante da imagem selecionada a cada iteracao
 @st.cache_data
 def histograma(imagem):
     image_array = np.array(imagem)
@@ -96,7 +98,7 @@ def histograma(imagem):
     plt.ylabel('Número de pixels')
     st.pyplot(plt)
     plt.clf()
-    
+#processado somente quando salvar a roi
 @st.cache_data
 def histograma_roi(imagem):
     image_array = np.array(imagem)
