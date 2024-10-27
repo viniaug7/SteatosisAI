@@ -311,6 +311,7 @@ with verROITab:
         roi_figado_normalizada = normalizar_figado(figadoROI[0], hi)
         st.session_state.ROIsSalvos.append((roi_figado_normalizada, figadoROI[1], figadoROI[2], gerar_id_unico(1000), figadoROI[3]))
         salvarROIEmCSVePasta(figadoROI[0], figadoROI[1], figadoROI[2], figadoROI[4], rimROI[4], hi)
+        st.success('Imagem .jpg salva nessa pasta e dados colocados nos csvs')
 
 
     c1,c2,c3 = st.columns(3);
