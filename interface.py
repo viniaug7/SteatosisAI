@@ -142,7 +142,7 @@ def carregar_arquivo_mat(caminho_arquivo):
     try:
         transformar_imagens_mat_em_botoes_na_sidebar(caminho_arquivo)
     except FileNotFoundError:
-        st.error(f"Arquivo {caminho_arquivo} não encontrado.")
+        print('Arquivo pre esperado nao encontrado, voce pode carregar ele com o browse na parte suprior esquerda')
     except Exception as e:
         st.error(f"Erro ao carregar o arquivo: {e}")
 
