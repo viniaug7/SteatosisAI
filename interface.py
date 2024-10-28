@@ -71,7 +71,6 @@ def salvarROIEmCSVePasta(imagemFigado, n, m, coordsFigado, coordsRim, HI, dadosG
         'classe': [classe],
     }
 
-    # Extract GLCM features
     distancias = [1, 2, 4, 8]
     i = 0
     for result in dadosGLCM:
@@ -81,16 +80,13 @@ def salvarROIEmCSVePasta(imagemFigado, n, m, coordsFigado, coordsRim, HI, dadosG
         data_para_csv[f'momentos_hu_{distancias[i]}'] = [result['hu_moments']]
         i += 1
 
-    # Create or load the DataFrame for classes
     if os.path.isfile(CLASSES_CSV_FILENAME):
         classes_data = pd.read_csv(CLASSES_CSV_FILENAME)
     else:
         classes_data = pd.DataFrame(columns=['nome', 'classe'])
 
-    # Add or update the classes DataFrame
     classes_data = pd.concat([classes_data, pd.DataFrame(data_para_csv)], ignore_index=True)
 
-    # Save the classes DataFrame back to the CSV
     classes_data.to_csv(CLASSES_CSV_FILENAME, index=False)
 
 
