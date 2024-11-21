@@ -302,7 +302,7 @@ with mainContainer:
             histograma(img)
     if (st.session_state.ROIDaImagem is not None):
         with col2:
-            st.image(st.session_state.ROIDaImagem, use_column_width=True)
+            st.image(st.session_state.ROIDaImagem, use_container_width=True)
         
         
 def calcular_hi(roi_figado, roi_rim):
