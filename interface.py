@@ -312,7 +312,7 @@ def calcular_hi(roi_figado, roi_rim):
     return hi
 
 def normalizar_figado(roi_figado, hi):
-    # multpalica os valores de pixel pelo HI e dpois arredonda
+    # multiplica os valores de pixel pelo HI e depois arredonda
     roi_normalizada = np.clip(np.round(roi_figado * hi), 0, 255).astype(np.uint8)
     return roi_normalizada
 
