@@ -609,10 +609,10 @@ def crossValidationVGG16(csv):
 
         # Treinamento
         optimizer = optim.Adam(model.parameters(), lr=0.001)
-        scaler = torch.cuda.amp.GradScaler("cuda")
+        scaler = torch.cuda.amp.GradScaler()
         model.train()
         for epoch in range(1):  # Ajuste o número de épocas conforme necessário
-            with torch.cuda.amp.autocast("cuda"):
+            with torch.cuda.amp.autocast():
                 outputs = model(X_train)
                 loss = criterion(outputs, y_train)
             scaler.scale(loss).backward()
