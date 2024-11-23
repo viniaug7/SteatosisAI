@@ -385,9 +385,9 @@ def pegaMomentoHu(lista, i):
         # st.write(lista)
     return lista[i]
 
-def SVM(X_train, y_train, X_test): 
+def SVM(X_train, y_train, X_test):#poli 100|rbf10|rbf100 -> 83   
     # Treinamento do modelo
-    model = SVC(kernel="linear", random_state=42)
+    model = SVC(C=10,kernel="linear", class_weight={0:38/55, 1:17/55},random_state=42)#kernel="linear", random_state=42{55/17,55/38}
     model.fit(X_train, y_train)
 
     # Predição e avaliação
@@ -419,20 +419,17 @@ def plot_matriz_confusao(matriz_confusao):
     st.pyplot(plt);
     plt.clf();
 
-def crossValidation(caminho):
-    df = preProcessarCsvs(caminho)
-    # Separar dados e classe
-    y = df["classe"]
-    X = df.dro
     
 def crossValidation(caminho):
     df = preProcessarCsvs(caminho)
     # Separar dados e classe
-    y = df["classe"]
+    y = df["classe"].replace({'saudavel': 1, 'esteatose': 0})
     X = df.drop(columns=["classe"])
 
     scaler = MinMaxScaler()
     X_scaled = scaler.fit_transform(X)
+
+
     # X_scaled = X
     # st.write(len(X_scaled));
     # st.write(X_scaled);
@@ -444,24 +441,23 @@ def crossValidation(caminho):
     especificidades = []
     sensibilidades = []
 
-    for i in range(0, len(X_scaled), 10):
+    for i in range(0, len(y), 10):
         # Definir as linhas de treino e teste
         start = i
         end = i + 10 
-        X_test = X_scaled[start:end]
+        X_test = X_scaled[start:end]#X_scaled
         y_test = y[start:end]
-        X_train = np.concatenate((X_scaled[:i], X_scaled[i+10:]), axis=0)  # Pega todas as linhas antes e depois do bloco de teste
-        y_train = np.concatenate((y[:i], y[i+10:]), axis=0) 
+        X_train = np.concatenate((X_scaled[:start], X_scaled[end:]))  # Pega todas as linhas antes e depois do bloco de teste
+        y_train = np.concatenate((y[:start], y[end:])) 
 
         # Treinamento e predição com SVM
         y_pred = SVM(X_train, y_train, X_test)
-
         # Acurácia e relatórios para cada iteração
         acuracias.append(accuracy_score(y_test, y_pred))
         relatorios.append(classification_report(y_test, y_pred))
 
         # Matriz de confusão
-        matriz_confusao = confusion_matrix(y_test, y_pred)
+        matriz_confusao = confusion_matrix(y_test,y_pred)
         
         # Se a matriz de confusão for 1x1, transforme em 2x2 com valores zero nas posições adequadas
         if matriz_confusao.shape == (1, 1):
@@ -483,7 +479,6 @@ def crossValidation(caminho):
             # Se a matriz for 1x1, sensibilidade e especificidade não podem ser calculadas
             sensibilidade = 0
             especificidade = 0
-
         sensibilidades.append(sensibilidade)
         especificidades.append(especificidade)
 
