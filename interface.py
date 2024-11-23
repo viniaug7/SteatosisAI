@@ -100,7 +100,7 @@ st.set_page_config(layout="wide")
 
 
 # st.title("Trabalho PAI")
-mainTab, verROITab, classificarTab  = st.tabs(["Imagem & Cortar ROI", "Ver ROIs", "Classificar"])
+mainTab, verROITab, treinarTab  = st.tabs(["Imagem & Cortar ROI", "Ver ROIs", "Classificar"])
 mainContainer = mainTab.container()
 
 if "ROIsSalvos" not in st.session_state:
@@ -409,8 +409,8 @@ def plot_matriz_confusao(matriz_confusao):
     ax.set_xticks([0, 1])
     ax.set_yticks([0, 1])
 
-    ax.set_xticklabels(['Predito: Negativo', 'Predito: Positivo'])
-    ax.set_yticklabels(['Real: Negativo', 'Real: Positivo'])
+    ax.set_xticklabels(['Predito: Esteatose', 'Predito: Saudável'])
+    ax.set_yticklabels(['Real: Esteatose', 'Real: Saudável'])
     
     ax.set_xlabel('Previsões')
     ax.set_ylabel('Valores Reais')
@@ -543,14 +543,11 @@ def preProcessarCsvs(caminho):
 
 
 
-
-
-
 # ast.literal_eval vai transformar "[0.324]" em [0.324] (uma lista em vez de string)
 def converterPraLista(listaQueEhUmaString):
     return ast.literal_eval(listaQueEhUmaString)
 
-with classificarTab:
+with treinarTab:
     if (st.button("Preprocessar csvs")):
         crossValidation(CLASSES_CSV_FILENAME)
 # O principal aqui é consertar os momentos_invariantes_de_hu que são uma string que é uma lista
