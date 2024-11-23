@@ -556,8 +556,8 @@ with treinarSVMTab:
 
 def carregar_e_processar_imagens(caminhos):
     transform = transforms.Compose([
-        transforms.Resize((224, 224)),  # Redimensiona para 224x224
-        transforms.Grayscale(num_output_channels=3),  # Converte grayscale para 3 canais
+        transforms.Resize((56, 56)),  # Redimensiona para 28
+        transforms.Grayscale(num_output_channels=3),  
         transforms.ToTensor(),  # Converte para tensor
         transforms.Normalize([0.485, 0.485, 0.485], [0.229, 0.229, 0.229])  # Normalização padrão para VGG16
     ])
@@ -594,6 +594,7 @@ def crossValidationVGG16(csv):
 
     # Modelo pré-treinado VGG16
     model = models.vgg16(pretrained=True)
+    model.features[0] = nn.Conv2d(3, 64, kernel_size=3, padding=1)  # Tamanho do kernel ajustado
     model.classifier[6] = nn.Linear(4096, len(set(y)))  # Ajustando a saída para o número de classes
     # device = torch.device("cpu")  # Forçar o uso da CPU
     device = "cuda" if torch.cuda.is_available() else "cpu"
