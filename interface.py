@@ -413,7 +413,7 @@ def preProcessarCsvs(caminho):
                 # preenche a nova coluna em todas as linhas com a posicao i do array
                 # st.write(nova_coluna)
                 df[nova_coluna] = df[col].apply(pegaMomentoHu, args=[i])
-        df.drop(columns=[col], inplace=True)
+            df.drop(columns=[col], inplace=True)
     st.write(df)
     
 
