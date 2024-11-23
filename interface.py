@@ -1,7 +1,9 @@
-#NT:(2322434)mod4 = 2  ->  Momentos invariantes de Hu, se NT=2
 #Eric Miranda: 771803
 #Gustavo Lorenzo: 782633
 #Vinicius Augusto: 767998
+#NT:(2322434)mod4 = 2  ->  Momentos invariantes de Hu, se NT=2
+#NC = SVM
+#ND = VGG16
 # Como rodar:
 # pip install streamlit streamlit-cropper scipy numpy matplotlib setuptools opencv-python streamlit_image_zoom scikit-image 
 # streamlit run interface.py
@@ -17,6 +19,7 @@ from skimage.feature import graycomatrix, graycoprops
 import pandas as pd
 import cv2
 import os
+import ast
 #from scipy.stats import entropy opcional, escolher qual processa mais rapido a entropia -> fiz na mão
 
 SIMPLE_CSV_FILENAME = 'dados_das_rois.csv'
@@ -372,3 +375,59 @@ with verROITab:
                 tabela_glcm(glcmData)
             #---------------------------------------------------------------------------------------------------------
             #colocar para aparecer as variaveis: escolher como aparecer
+
+def pegaMomentoHu(lista, i):
+    # limita o float enorme para somente 8 casas decimais
+    # if (lista[0] == 0.009478427989614603):
+        # st.write(lista)
+    return lista[i]
+
+
+def preProcessarCsvs(caminho):
+    if os.path.isfile(caminho) == False:
+        return;
+    df = pd.read_csv(caminho)
+    for col in df.columns:
+        if 'momentos_hu' in col:
+            # 'momentos_hu' está assim "[0.324, 0.123...]"
+            # isso daqui eh pra transformar numa lista de verdade em vez de uma string
+            # st.write(df[col])
+            df[col] = df[col].apply(converterPraLista)
+            # st.write(df[col])
+            # st.write(df[col][0][3])
+            # Expandir os momentos em colunas separadas
+            # Faz a columna 'momentos_hu' virar varias colunas
+            # momentos_hu_1 == [0.23, 0.123...]
+            # momentos_hu_x = [0.23, 0.123...]
+            # Transformar em
+            # momentos_hu_1_0 = 0.23
+            # momentos_hu_1_1 = 0.123
+            # momentos_hu_x_0 = 0.23
+            # momentos_hu_x_1 = 0.123
+            # st.write(df[col])
+            # ...
+            # st.write(df[col])
+            for i in range(len(df[col][0])):
+                # st.write(len(df[col][0]))
+                nova_coluna = f'{col}_{i}'
+                # preenche a nova coluna em todas as linhas com a posicao i do array
+                # st.write(nova_coluna)
+                df[nova_coluna] = df[col].apply(pegaMomentoHu, args=[i])
+        df.drop(columns=[col], inplace=True)
+    st.write(df)
+    
+
+
+
+
+
+
+
+# ast.literal_eval vai transformar "[0.324]" em [0.324] (uma lista em vez de string)
+def converterPraLista(listaQueEhUmaString):
+    return ast.literal_eval(listaQueEhUmaString)
+
+with classificarTab:
+    if (st.button("Preprocessar csvs")):
+        preProcessarCsvs(CLASSES_CSV_FILENAME)
+# O principal aqui é consertar os momentos_invariantes_de_hu que são uma string que é uma lista
