@@ -419,14 +419,8 @@ def plot_matriz_confusao(matriz_confusao):
     st.pyplot(plt);
     plt.clf();
 
-def crossValidation(caminho):
-    df = preProcessarCsvs(caminho)
-    # Separar dados e classe
-    y = df["classe"]
-    X = df.dro
-    
-def crossValidation(caminho):
-    df = preProcessarCsvs(caminho)
+def crossValidation(csv):
+    df = preProcessarCsvs(csv)
     # Separar dados e classe
     y = df["classe"]
     X = df.drop(columns=["classe"])
@@ -505,10 +499,8 @@ def crossValidation(caminho):
 
 
 @st.cache_data
-def preProcessarCsvs(caminho):
-    if os.path.isfile(caminho) == False:
-        return;
-    df = pd.read_csv(caminho)
+def preProcessarCsvs(csv):
+    df = pd.read_csv(csv)
     for col in df.columns:
         if 'momentos_hu' in col:
             # 'momentos_hu' está assim "[0.324, 0.123...]"
@@ -549,6 +541,11 @@ def converterPraLista(listaQueEhUmaString):
 
 with treinarSVMTab:
     # Deixar o usuario escolher o arquivo csv
-    arquivo = st.file_uploader("Escolha o arquivo CSV", type=["csv"])
+    arquivo = st.file_uploader("Escolha o arquivo CSV para o SVM", type=["csv"])
     if (arquivo):
         crossValidation(arquivo)
+
+with treinarVGGTab:
+    arquivo = st.file_uploader("Escolha o arquivo CSV para o VGG", type=["csv"])
+    if (arquivo):
+        preProcessarCsvs(arquivo)
