@@ -394,6 +394,37 @@ def SVM(X_train, y_train, X_test):
     return model.predict(X_test)
 
 
+def plot_matriz_confusao(matriz_confusao):
+    # Criar a figura e o eixo para plotar
+    fig, ax = plt.subplots(figsize=(6, 4))
+    
+    cax = ax.matshow(matriz_confusao, cmap='Blues')  # Usando 'Blues' para cores
+    fig.colorbar(cax)  # Adicionando barra de cores
+
+    # Adicionando os valores dentro das células
+    for i in range(matriz_confusao.shape[0]):
+        for j in range(matriz_confusao.shape[1]):
+            ax.text(j, i, f'{matriz_confusao[i, j]}', ha='center', va='center', color='black')
+
+    ax.set_xticks([0, 1])
+    ax.set_yticks([0, 1])
+
+    ax.set_xticklabels(['Predito: Negativo', 'Predito: Positivo'])
+    ax.set_yticklabels(['Real: Negativo', 'Real: Positivo'])
+    
+    ax.set_xlabel('Previsões')
+    ax.set_ylabel('Valores Reais')
+    
+    plt.title("Matriz de Confusão")
+    st.pyplot(plt);
+    plt.clf();
+
+def crossValidation(caminho):
+    df = preProcessarCsvs(caminho)
+    # Separar dados e classe
+    y = df["classe"]
+    X = df.dro
+    
 def crossValidation(caminho):
     df = preProcessarCsvs(caminho)
     # Separar dados e classe
@@ -461,7 +492,8 @@ def crossValidation(caminho):
     # Exibindo a matriz de confusão geral (somatória de todas as iterações)
     st.write("Matriz de Confusão Média (somatória de todas as iterações):")
     matriz_confusao_media = np.sum(matrizes_confusao, axis=0)
-    st.write(matriz_confusao_media)
+    plot_matriz_confusao(matriz_confusao_media)  # Exibindo a matriz de confusão média
+
 
     # Exibir os relatórios de classificação (se desejar mostrar o relatório completo de cada iteração, pode incluir aqui)
     st.write("Relatórios de Classificação de cada iteração:")
