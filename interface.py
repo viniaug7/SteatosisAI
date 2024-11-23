@@ -14,7 +14,7 @@ import scipy.io
 from streamlit_cropper import st_cropper
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MaxAbsScaler, MinMaxScaler
 from PIL import Image
 from streamlit_image_zoom import image_zoom
 from skimage.feature import graycomatrix, graycoprops
@@ -431,8 +431,11 @@ def crossValidation(caminho):
     y = df["classe"]
     X = df.drop(columns=["classe"])
 
-    scaler = StandardScaler()
+    scaler = MinMaxScaler()
     X_scaled = scaler.fit_transform(X)
+    # X_scaled = X
+    # st.write(len(X_scaled));
+    # st.write(X_scaled);
 
     # Inicializando variáveis para armazenar métricas gerais
     acuracias = []
@@ -444,11 +447,11 @@ def crossValidation(caminho):
     for i in range(0, len(X_scaled), 10):
         # Definir as linhas de treino e teste
         start = i
-        end = i + 10
+        end = i + 10 
         X_test = X_scaled[start:end]
         y_test = y[start:end]
         X_train = np.concatenate((X_scaled[:i], X_scaled[i+10:]), axis=0)  # Pega todas as linhas antes e depois do bloco de teste
-        y_train = np.concatenate((y[:i], y[i+10:]), axis=0)
+        y_train = np.concatenate((y[:i], y[i+10:]), axis=0) 
 
         # Treinamento e predição com SVM
         y_pred = SVM(X_train, y_train, X_test)
@@ -496,9 +499,9 @@ def crossValidation(caminho):
 
 
     # Exibir os relatórios de classificação (se desejar mostrar o relatório completo de cada iteração, pode incluir aqui)
-    st.write("Relatórios de Classificação de cada iteração:")
-    for relatorio in relatorios:
-        st.write(relatorio)
+    # st.write("Relatórios de Classificação de cada iteração:")
+    # for relatorio in relatorios:
+    #     st.write(relatorio)
 
 
 @st.cache_data
