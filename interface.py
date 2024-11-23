@@ -5,13 +5,20 @@
 #NC = SVM
 #ND = VGG16
 # Como rodar:
-# pip install streamlit streamlit-cropper scipy numpy matplotlib setuptools opencv-python streamlit_image_zoom scikit-image scikit-learn
+# Use python 3.10
+# pip install streamlit streamlit-cropper scipy numpy matplotlib setuptools opencv-python streamlit_image_zoom scikit-image scikit-learn torch
 # streamlit run interface.py
 import streamlit as st
 from random import randint
 from sklearn.svm import SVC
 import scipy.io
 from streamlit_cropper import st_cropper
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torchvision import models, transforms
+from torch.utils.data import DataLoader, TensorDataset
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler, MaxAbsScaler, MinMaxScaler
@@ -100,7 +107,7 @@ st.set_page_config(layout="wide")
 
 
 # st.title("Trabalho PAI")
-mainTab, verROITab, classificarTab  = st.tabs(["Imagem & Cortar ROI", "Ver ROIs", "Classificar"])
+mainTab, verROITab, treinarSVMTab, treinarVGGTab, classificarTab  = st.tabs(["Imagem & Cortar ROI", "Ver ROIs", "TreinarSVM", "TreinarVGG16", 'Classificar'])
 mainContainer = mainTab.container()
 
 if "ROIsSalvos" not in st.session_state:
@@ -409,8 +416,8 @@ def plot_matriz_confusao(matriz_confusao):
     ax.set_xticks([0, 1])
     ax.set_yticks([0, 1])
 
-    ax.set_xticklabels(['Predito: Negativo', 'Predito: Positivo'])
-    ax.set_yticklabels(['Real: Negativo', 'Real: Positivo'])
+    ax.set_xticklabels(['Predito: Esteatose', 'Predito: Saudável'])
+    ax.set_yticklabels(['Real: Esteatose', 'Real: Saudável'])
     
     ax.set_xlabel('Previsões')
     ax.set_ylabel('Valores Reais')
@@ -419,9 +426,8 @@ def plot_matriz_confusao(matriz_confusao):
     st.pyplot(plt);
     plt.clf();
 
-    
-def crossValidation(caminho):
-    df = preProcessarCsvs(caminho)
+def crossValidationSVM(csv):
+    df = preProcessarCsvs(csv)
     # Separar dados e classe
     y = df["classe"].replace({'saudavel': 1, 'esteatose': 0})
     X = df.drop(columns=["classe"])
@@ -500,10 +506,8 @@ def crossValidation(caminho):
 
 
 @st.cache_data
-def preProcessarCsvs(caminho):
-    if os.path.isfile(caminho) == False:
-        return;
-    df = pd.read_csv(caminho)
+def preProcessarCsvs(csv, dropNome=True):
+    df = pd.read_csv(csv)
     for col in df.columns:
         if 'momentos_hu' in col:
             # 'momentos_hu' está assim "[0.324, 0.123...]"
@@ -531,12 +535,10 @@ def preProcessarCsvs(caminho):
                 # st.write(nova_coluna)
                 df[nova_coluna] = df[col].apply(pegaMomentoHu, args=[i])
             df.drop(columns=[col], inplace=True)
-    df.drop(columns=['nome'], inplace=True);
+    if (dropNome):
+        df.drop(columns=['nome'], inplace=True);
     return df;
     
-
-
-
 
 
 
@@ -545,7 +547,122 @@ def preProcessarCsvs(caminho):
 def converterPraLista(listaQueEhUmaString):
     return ast.literal_eval(listaQueEhUmaString)
 
-with classificarTab:
-    if (st.button("Preprocessar csvs")):
-        crossValidation(CLASSES_CSV_FILENAME)
-# O principal aqui é consertar os momentos_invariantes_de_hu que são uma string que é uma lista
+with treinarSVMTab:
+    # Deixar o usuario escolher o arquivo csv
+    arquivo = st.file_uploader("Escolha o arquivo CSV para o SVM", type=["csv"])
+    if (arquivo):
+        crossValidationSVM(arquivo)
+
+
+def carregar_e_processar_imagens(caminhos):
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),  # Redimensiona para 224x224
+        transforms.Grayscale(num_output_channels=3),  # Converte grayscale para 3 canais
+        transforms.ToTensor(),  # Converte para tensor
+        transforms.Normalize([0.485, 0.485, 0.485], [0.229, 0.229, 0.229])  # Normalização padrão para VGG16
+    ])
+    imagens = []
+    for caminho in caminhos:
+        img = Image.open(caminho).convert("L")  # Abre a imagem em grayscale
+        img = transform(img)  # Aplica as transformações
+        imagens.append(img)
+    return torch.stack(imagens)
+
+def crossValidationVGG16(csv):
+    df = preProcessarCsvs(csv, dropNome=False)
+    
+    # Separar dados e classe
+    y = df["classe"].values
+    caminhos_imagens = df["nome"].values
+    # converte strings de y para 0 1
+    y = [0 if classe == 'saudavel' else 1 for classe in y]
+
+    # Carregar todas as imagens e processá-las
+    X_tensor = carregar_e_processar_imagens(caminhos_imagens)
+    y_tensor = torch.tensor(y, dtype=torch.long)
+
+    # Divisão em batches para validação cruzada
+    batch_size = 1
+    n_samples = len(X_tensor)
+
+    # Métricas gerais
+    acuracias = []
+    relatorios = []
+    matrizes_confusao = []
+    especificidades = []
+    sensibilidades = []
+
+    # Modelo pré-treinado VGG16
+    model = models.vgg16(pretrained=True)
+    model.classifier[6] = nn.Linear(4096, len(set(y)))  # Ajustando a saída para o número de classes
+    model = model.to("cuda" if torch.cuda.is_available() else "cpu")
+    criterion = nn.CrossEntropyLoss()
+
+    for i in range(0, n_samples, batch_size):
+        # Dados de treino e teste
+        X_test = X_tensor[i:i+batch_size].to("cuda" if torch.cuda.is_available() else "cpu")
+        y_test = y_tensor[i:i+batch_size].to("cuda" if torch.cuda.is_available() else "cpu")
+        X_train = torch.cat([X_tensor[:i], X_tensor[i+batch_size:]]).to("cuda" if torch.cuda.is_available() else "cpu")
+        y_train = torch.cat([y_tensor[:i], y_tensor[i+batch_size:]]).to("cuda" if torch.cuda.is_available() else "cpu")
+
+        # Treinamento
+        optimizer = optim.Adam(model.parameters(), lr=0.001)
+        model.train()
+        for epoch in range(5):  # Ajuste o número de épocas conforme necessário
+            optimizer.zero_grad()
+            outputs = model(X_train)
+            loss = criterion(outputs, y_train)
+            loss.backward()
+            optimizer.step()
+
+        # Predição
+        model.eval()
+        with torch.no_grad():
+            y_pred = model(X_test)
+            y_pred_classes = torch.argmax(y_pred, axis=1).cpu().numpy()
+
+        # Acurácia e relatórios
+        acuracias.append(accuracy_score(y_test.cpu().numpy(), y_pred_classes))
+        relatorios.append(classification_report(y_test.cpu().numpy(), y_pred_classes))
+
+        # Matriz de confusão
+        matriz_confusao = confusion_matrix(y_test.cpu().numpy(), y_pred_classes)
+        matrizes_confusao.append(matriz_confusao)
+
+        # Sensibilidade e especificidade
+        if matriz_confusao.shape == (2, 2):
+            tp = matriz_confusao[1, 1]
+            tn = matriz_confusao[0, 0]
+            fp = matriz_confusao[0, 1]
+            fn = matriz_confusao[1, 0]
+
+            sensibilidade = tp / (tp + fn) if tp + fn > 0 else 0
+            especificidade = tn / (tn + fp) if tn + fp > 0 else 0
+        else:
+            sensibilidade = especificidade = 0
+
+        sensibilidades.append(sensibilidade)
+        especificidades.append(especificidade)
+        torch.cuda.empty_cache() # para nao estourar memoria da gpu
+
+
+    # Resultados finais
+    print("Média de Acurácias:", np.mean(acuracias))
+    print("Média de Sensibilidade:", np.mean(sensibilidades))
+    print("Média de Especificidade:", np.mean(especificidades))
+
+    # Matriz de confusão média
+    matriz_confusao_media = np.sum(matrizes_confusao, axis=0)
+    print("Matriz de Confusão Média:")
+    plot_matriz_confusao(matriz_confusao_media)
+
+    # Relatórios detalhados
+    # print("Relatórios de Classificação:")
+    # for relatorio in relatorios:
+    #     print(relatorio)
+
+
+with treinarVGGTab:
+    arquivo = st.file_uploader("Escolha o arquivo CSV para o VGG", type=["csv"])
+    if (arquivo):
+        crossValidationVGG16(arquivo)
