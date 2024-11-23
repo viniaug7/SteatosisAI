@@ -22,7 +22,7 @@ import pandas as pd
 import cv2
 import os
 import ast
-from sklearn.metrics import classification_report, accuracy_score
+from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
 
 
 SIMPLE_CSV_FILENAME = 'dados_das_rois.csv'
@@ -385,7 +385,16 @@ def pegaMomentoHu(lista, i):
         # st.write(lista)
     return lista[i]
 
-def SVM(caminho):
+def SVM(X_train, y_train, X_test): 
+    # Treinamento do modelo
+    model = SVC(kernel="linear", random_state=42)
+    model.fit(X_train, y_train)
+
+    # Predição e avaliação
+    return model.predict(X_test)
+
+
+def crossValidation(caminho):
     df = preProcessarCsvs(caminho)
     # Separar dados e classe
     y = df["classe"]
@@ -397,46 +406,67 @@ def SVM(caminho):
     # Inicializando variáveis para armazenar métricas gerais
     acuracias = []
     relatorios = []
-
-    # Criar o modelo uma vez
-    model = SVC(kernel="linear", random_state=42)
+    matrizes_confusao = []
+    especificidades = []
+    sensibilidades = []
 
     for i in range(0, len(X_scaled), 10):
         # Definir as linhas de treino e teste
-        # Pegar 10 linhas para teste. Se i for 2, deve ainda pegar 10 linhas e o treino deve incluir as linas 0-10
-        start = i;
-        end = i + 10;
+        start = i
+        end = i + 10
         X_test = X_scaled[start:end]
         y_test = y[start:end]
         X_train = np.concatenate((X_scaled[:i], X_scaled[i+10:]), axis=0)  # Pega todas as linhas antes e depois do bloco de teste
         y_train = np.concatenate((y[:i], y[i+10:]), axis=0)
 
-        
-
-        # X_train = X_scaled[10]
-        # X_train = X_scaled[:i+10]  # Dados de treino até a linha 'i+10'
-        # y_train = y[:i+10]
-        # X_test = X_scaled[i:i+10]  # As próximas 10 linhas como teste
-        # y_test = y[i:i+10]
-
-        # Treinamento do modelo
-        model.fit(X_train, y_train)
-
-        # Predição e avaliação
-        y_pred = model.predict(X_test)
+        # Treinamento e predição com SVM
+        y_pred = SVM(X_train, y_train, X_test)
 
         # Acurácia e relatórios para cada iteração
         acuracias.append(accuracy_score(y_test, y_pred))
         relatorios.append(classification_report(y_test, y_pred))
 
-        # Exibir resultados
-        st.write(f"Treinamento até a linha {i+10}:")
-        st.write("Acurácia:", acuracias[-1])
-        st.write(relatorios[-1])
+        # Matriz de confusão
+        matriz_confusao = confusion_matrix(y_test, y_pred)
+        
+        # Se a matriz de confusão for 1x1, transforme em 2x2 com valores zero nas posições adequadas
+        if matriz_confusao.shape == (1, 1):
+            matriz_confusao = np.array([[matriz_confusao[0, 0], 0], [0, 0]])
+        
+        matrizes_confusao.append(matriz_confusao)
+
+        # Verificar o tamanho da matriz de confusão
+        if matriz_confusao.shape[0] > 1 and matriz_confusao.shape[1] > 1:
+            # Se a matriz de confusão for 2x2, calcule sensibilidade e especificidade
+            tp = matriz_confusao[1, 1]  # True Positives
+            tn = matriz_confusao[0, 0]  # True Negatives
+            fp = matriz_confusao[0, 1]  # False Positives
+            fn = matriz_confusao[1, 0]  # False Negatives
+
+            sensibilidade = tp / (tp + fn) if tp + fn > 0 else 0
+            especificidade = tn / (tn + fp) if tn + fp > 0 else 0
+        else:
+            # Se a matriz for 1x1, sensibilidade e especificidade não podem ser calculadas
+            sensibilidade = 0
+            especificidade = 0
+
+        sensibilidades.append(sensibilidade)
+        especificidades.append(especificidade)
 
     # Exibindo as métricas gerais ao final
-    st.write("Acurácias de cada bloco de teste:", acuracias)
-    st.write("Relatórios de classificação de cada bloco de teste:", relatorios)
+    st.write("Média de Acurácias:", np.mean(acuracias))
+    st.write("Média de Sensibilidade:", np.mean(sensibilidades))
+    st.write("Média de Especificidade:", np.mean(especificidades))
+
+    # Exibindo a matriz de confusão geral (somatória de todas as iterações)
+    st.write("Matriz de Confusão Média (somatória de todas as iterações):")
+    matriz_confusao_media = np.sum(matrizes_confusao, axis=0)
+    st.write(matriz_confusao_media)
+
+    # Exibir os relatórios de classificação (se desejar mostrar o relatório completo de cada iteração, pode incluir aqui)
+    st.write("Relatórios de Classificação de cada iteração:")
+    for relatorio in relatorios:
+        st.write(relatorio)
 
 
 @st.cache_data
@@ -487,5 +517,5 @@ def converterPraLista(listaQueEhUmaString):
 
 with classificarTab:
     if (st.button("Preprocessar csvs")):
-        SVM(CLASSES_CSV_FILENAME)
+        crossValidation(CLASSES_CSV_FILENAME)
 # O principal aqui é consertar os momentos_invariantes_de_hu que são uma string que é uma lista
