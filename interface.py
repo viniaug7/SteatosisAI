@@ -582,7 +582,7 @@ def crossValidationVGG16(csv):
     y_tensor = torch.tensor(y, dtype=torch.long)
 
     # Divisão em batches para validação cruzada
-    batch_size = 1
+    batch_size = 10
     n_samples = len(X_tensor)
 
     # Métricas gerais
@@ -595,25 +595,31 @@ def crossValidationVGG16(csv):
     # Modelo pré-treinado VGG16
     model = models.vgg16(pretrained=True)
     model.classifier[6] = nn.Linear(4096, len(set(y)))  # Ajustando a saída para o número de classes
-    model = model.to("cuda" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cpu")  # Forçar o uso da CPU
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = model.to(device)
     criterion = nn.CrossEntropyLoss()
 
     for i in range(0, n_samples, batch_size):
         # Dados de treino e teste
-        X_test = X_tensor[i:i+batch_size].to("cuda" if torch.cuda.is_available() else "cpu")
-        y_test = y_tensor[i:i+batch_size].to("cuda" if torch.cuda.is_available() else "cpu")
-        X_train = torch.cat([X_tensor[:i], X_tensor[i+batch_size:]]).to("cuda" if torch.cuda.is_available() else "cpu")
-        y_train = torch.cat([y_tensor[:i], y_tensor[i+batch_size:]]).to("cuda" if torch.cuda.is_available() else "cpu")
+        X_test = X_tensor[i:i+batch_size].to(device)
+        y_test = y_tensor[i:i+batch_size].to(device)
+        X_train = torch.cat([X_tensor[:i], X_tensor[i+batch_size:]]).to(device)
+        y_train = torch.cat([y_tensor[:i], y_tensor[i+batch_size:]]).to(device)
 
         # Treinamento
         optimizer = optim.Adam(model.parameters(), lr=0.001)
+        scaler = torch.cuda.amp.GradScaler("cuda")
         model.train()
-        for epoch in range(5):  # Ajuste o número de épocas conforme necessário
-            optimizer.zero_grad()
-            outputs = model(X_train)
-            loss = criterion(outputs, y_train)
-            loss.backward()
-            optimizer.step()
+        for epoch in range(1):  # Ajuste o número de épocas conforme necessário
+            with torch.cuda.amp.autocast("cuda"):
+                outputs = model(X_train)
+                loss = criterion(outputs, y_train)
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+            torch.cuda.empty_cache()  # Libera a memória depois de cada lote
+
 
         # Predição
         model.eval()
@@ -643,7 +649,6 @@ def crossValidationVGG16(csv):
 
         sensibilidades.append(sensibilidade)
         especificidades.append(especificidade)
-        torch.cuda.empty_cache() # para nao estourar memoria da gpu
 
 
     # Resultados finais
