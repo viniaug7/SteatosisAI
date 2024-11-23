@@ -385,7 +385,6 @@ def pegaMomentoHu(lista, i):
         # st.write(lista)
     return lista[i]
 
-
 def SVM(caminho):
     df = preProcessarCsvs(caminho)
     # Separar dados e classe
@@ -395,20 +394,49 @@ def SVM(caminho):
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    # Pegue as primeiras 10 linhas para teste e o resto para treino
-    X_train = X_scaled[10:]
-    y_train = y[10:]
-    X_test = X_scaled[:10]
-    y_test = y[:10]
-    # st.write("Classes encontradas:", y_train.unique())
+    # Inicializando variáveis para armazenar métricas gerais
+    acuracias = []
+    relatorios = []
 
+    # Criar o modelo uma vez
     model = SVC(kernel="linear", random_state=42)
-    model.fit(X_train, y_train)
 
+    for i in range(0, len(X_scaled), 10):
+        # Definir as linhas de treino e teste
+        # Pegar 10 linhas para teste. Se i for 2, deve ainda pegar 10 linhas e o treino deve incluir as linas 0-10
+        start = i;
+        end = i + 10;
+        X_test = X_scaled[start:end]
+        y_test = y[start:end]
+        X_train = np.concatenate((X_scaled[:i], X_scaled[i+10:]), axis=0)  # Pega todas as linhas antes e depois do bloco de teste
+        y_train = np.concatenate((y[:i], y[i+10:]), axis=0)
 
-    y_pred = model.predict(X_test)
-    st.write("Acurácia:", accuracy_score(y_test, y_pred))
-    st.write(classification_report(y_test, y_pred))
+        
+
+        # X_train = X_scaled[10]
+        # X_train = X_scaled[:i+10]  # Dados de treino até a linha 'i+10'
+        # y_train = y[:i+10]
+        # X_test = X_scaled[i:i+10]  # As próximas 10 linhas como teste
+        # y_test = y[i:i+10]
+
+        # Treinamento do modelo
+        model.fit(X_train, y_train)
+
+        # Predição e avaliação
+        y_pred = model.predict(X_test)
+
+        # Acurácia e relatórios para cada iteração
+        acuracias.append(accuracy_score(y_test, y_pred))
+        relatorios.append(classification_report(y_test, y_pred))
+
+        # Exibir resultados
+        st.write(f"Treinamento até a linha {i+10}:")
+        st.write("Acurácia:", acuracias[-1])
+        st.write(relatorios[-1])
+
+    # Exibindo as métricas gerais ao final
+    st.write("Acurácias de cada bloco de teste:", acuracias)
+    st.write("Relatórios de classificação de cada bloco de teste:", relatorios)
 
 
 @st.cache_data
