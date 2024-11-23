@@ -1,5 +1,4 @@
 n,m,nome_arquivo,classe,coords_figado,coords_rim,HI
-8,5,ROI_08_5.jpg,saudavel,294-172,233-201,1.2261949397843337
 54,0,ROI_54_0.jpg,esteatose,298-123,274-185,1.5057630858186246
 54,1,ROI_54_1.jpg,esteatose,293-131,271-189,1.4414808769521832
 54,2,ROI_54_2.jpg,esteatose,298-120,278-185,1.4997770594136663
