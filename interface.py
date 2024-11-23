@@ -100,7 +100,7 @@ st.set_page_config(layout="wide")
 
 
 # st.title("Trabalho PAI")
-mainTab, verROITab, treinarTab  = st.tabs(["Imagem & Cortar ROI", "Ver ROIs", "Classificar"])
+mainTab, verROITab, treinarSVMTab, treinarVGGTab, classificarTab  = st.tabs(["Imagem & Cortar ROI", "Ver ROIs", "TreinarSVM", "TreinarVGG16", 'Classificar'])
 mainContainer = mainTab.container()
 
 if "ROIsSalvos" not in st.session_state:
@@ -547,7 +547,8 @@ def preProcessarCsvs(caminho):
 def converterPraLista(listaQueEhUmaString):
     return ast.literal_eval(listaQueEhUmaString)
 
-with treinarTab:
-    if (st.button("Preprocessar csvs")):
-        crossValidation(CLASSES_CSV_FILENAME)
-# O principal aqui é consertar os momentos_invariantes_de_hu que são uma string que é uma lista
+with treinarSVMTab:
+    # Deixar o usuario escolher o arquivo csv
+    arquivo = st.file_uploader("Escolha o arquivo CSV", type=["csv"])
+    if (arquivo):
+        crossValidation(arquivo)
