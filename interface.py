@@ -5,14 +5,16 @@
 #NC = SVM
 #ND = VGG16
 # Como rodar:
-# pip install streamlit streamlit-cropper scipy numpy matplotlib setuptools opencv-python streamlit_image_zoom scikit-image 
+# pip install streamlit streamlit-cropper scipy numpy matplotlib setuptools opencv-python streamlit_image_zoom scikit-image scikit-learn
 # streamlit run interface.py
 import streamlit as st
 from random import randint
+# from sklearn.svm import SVC
 import scipy.io
 from streamlit_cropper import st_cropper
 import numpy as np
 import matplotlib.pyplot as plt
+# from sklearn.preprocessing import StandardScaler
 from PIL import Image
 from streamlit_image_zoom import image_zoom
 from skimage.feature import graycomatrix, graycoprops
@@ -20,7 +22,8 @@ import pandas as pd
 import cv2
 import os
 import ast
-#from scipy.stats import entropy opcional, escolher qual processa mais rapido a entropia -> fiz na mão
+from sklearn.metrics import classification_report, accuracy_score
+
 
 SIMPLE_CSV_FILENAME = 'dados_das_rois.csv'
 CLASSES_CSV_FILENAME = 'rois_com_classes.csv'
@@ -383,6 +386,30 @@ def pegaMomentoHu(lista, i):
     return lista[i]
 
 
+def SVM():
+    df = preProcessarCsvs(CLASSES_CSV_FILENAME)
+    # Separar dados e classe
+    X = df.drop(columns=["classe"])
+    y = df["classe"]
+
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    # Pegue as primeiras 10 linhas para treino e o resto para teste
+    X_train = X_scaled[:10]
+    y_train = y[:10]
+    X_test = X_scaled[10:]
+    y_test = y[10:]
+
+    model = SVC(kernel="linear", random_state=42)
+    model.fit(X_train, y_train)
+
+    y_pred = model.predict(X_test)
+    st.write("Acurácia:", accuracy_score(y_test, y_pred))
+    st.write(classification_report(y_test, y_pred))
+
+
+@st.cache_data
 def preProcessarCsvs(caminho):
     if os.path.isfile(caminho) == False:
         return;
@@ -414,6 +441,7 @@ def preProcessarCsvs(caminho):
                 # st.write(nova_coluna)
                 df[nova_coluna] = df[col].apply(pegaMomentoHu, args=[i])
             df.drop(columns=[col], inplace=True)
+    df.drop('nome');
     st.write(df)
     
 
@@ -429,5 +457,5 @@ def converterPraLista(listaQueEhUmaString):
 
 with classificarTab:
     if (st.button("Preprocessar csvs")):
-        preProcessarCsvs(CLASSES_CSV_FILENAME)
+        SVM(CLASSES_CSV_FILENAME)
 # O principal aqui é consertar os momentos_invariantes_de_hu que são uma string que é uma lista
