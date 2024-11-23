@@ -556,8 +556,8 @@ with treinarSVMTab:
 
 def carregar_e_processar_imagens(caminhos):
     transform = transforms.Compose([
-        transforms.Resize((56, 56)),  # Redimensiona para 28
-        transforms.Grayscale(num_output_channels=3),  
+        transforms.Resize((56, 56)),  # Redimensiona para 224x224
+        transforms.Grayscale(num_output_channels=3),  # Converte para 3 canais (escala de cinza com 3 canais)
         transforms.ToTensor(),  # Converte para tensor
         transforms.Normalize([0.485, 0.485, 0.485], [0.229, 0.229, 0.229])  # Normalização padrão para VGG16
     ])
@@ -581,9 +581,16 @@ def crossValidationVGG16(csv):
     X_tensor = carregar_e_processar_imagens(caminhos_imagens)
     y_tensor = torch.tensor(y, dtype=torch.long)
 
+    # Verificar dimensões
+    assert X_tensor.shape[0] == len(y_tensor), "O número de imagens e rótulos não coincide!"
+
     # Divisão em batches para validação cruzada
     batch_size = 10
     n_samples = len(X_tensor)
+
+    # Verificar se o número de amostras é divisível pelo batch_size
+    if n_samples % batch_size != 0:
+        print(f"Atenção: O número de amostras ({n_samples}) não é divisível pelo tamanho do lote ({batch_size}). Ajustando o último lote...")
 
     # Métricas gerais
     acuracias = []
@@ -594,24 +601,32 @@ def crossValidationVGG16(csv):
 
     # Modelo pré-treinado VGG16
     model = models.vgg16(pretrained=True)
-    model.features[0] = nn.Conv2d(3, 64, kernel_size=3, padding=1)  # Tamanho do kernel ajustado
+    model.features[0] = nn.Conv2d(3, 64, kernel_size=3, padding=1)  # Ajuste da camada convolucional para 3 canais
     model.classifier[6] = nn.Linear(4096, len(set(y)))  # Ajustando a saída para o número de classes
-    # device = torch.device("cpu")  # Forçar o uso da CPU
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = model.to(device)
     criterion = nn.CrossEntropyLoss()
 
     for i in range(0, n_samples, batch_size):
-        # Dados de treino e teste
-        X_test = X_tensor[i:i+batch_size].to(device)
-        y_test = y_tensor[i:i+batch_size].to(device)
-        X_train = torch.cat([X_tensor[:i], X_tensor[i+batch_size:]]).to(device)
-        y_train = torch.cat([y_tensor[:i], y_tensor[i+batch_size:]]).to(device)
+        # Garantir que o último lote tenha o mesmo tamanho, ignorando o último lote se necessário
+        torch.cuda.empty_cache()  # Libera a memória depois de cada lote
+        if i + batch_size > n_samples:
+            X_test = X_tensor[i:].to(device)
+            y_test = y_tensor[i:].to(device)
+            X_train = X_tensor[:i].to(device)
+            y_train = y_tensor[:i].to(device)
+        else:
+            # Dados de treino e teste
+            X_test = X_tensor[i:i+batch_size].to(device)
+            y_test = y_tensor[i:i+batch_size].to(device)
+            X_train = torch.cat([X_tensor[:i], X_tensor[i+batch_size:]]).to(device)
+            y_train = torch.cat([y_tensor[:i], y_tensor[i+batch_size:]]).to(device)
 
         # Treinamento
         optimizer = optim.Adam(model.parameters(), lr=0.001)
         scaler = torch.cuda.amp.GradScaler()
         model.train()
+        torch.cuda.empty_cache()  # Libera a memória depois de cada lote
         for epoch in range(1):  # Ajuste o número de épocas conforme necessário
             with torch.cuda.amp.autocast():
                 outputs = model(X_train)
@@ -620,7 +635,6 @@ def crossValidationVGG16(csv):
             scaler.step(optimizer)
             scaler.update()
             torch.cuda.empty_cache()  # Libera a memória depois de cada lote
-
 
         # Predição
         model.eval()
@@ -650,7 +664,7 @@ def crossValidationVGG16(csv):
 
         sensibilidades.append(sensibilidade)
         especificidades.append(especificidade)
-
+        torch.cuda.empty_cache()  # Libera a memória depois de cada lote
 
     # Resultados finais
     print("Média de Acurácias:", np.mean(acuracias))
@@ -662,10 +676,6 @@ def crossValidationVGG16(csv):
     print("Matriz de Confusão Média:")
     plot_matriz_confusao(matriz_confusao_media)
 
-    # Relatórios detalhados
-    # print("Relatórios de Classificação:")
-    # for relatorio in relatorios:
-    #     print(relatorio)
 
 
 with treinarVGGTab:
