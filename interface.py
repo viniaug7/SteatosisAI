@@ -9,12 +9,12 @@
 # streamlit run interface.py
 import streamlit as st
 from random import randint
-# from sklearn.svm import SVC
+from sklearn.svm import SVC
 import scipy.io
 from streamlit_cropper import st_cropper
 import numpy as np
 import matplotlib.pyplot as plt
-# from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler
 from PIL import Image
 from streamlit_image_zoom import image_zoom
 from skimage.feature import graycomatrix, graycoprops
@@ -386,23 +386,25 @@ def pegaMomentoHu(lista, i):
     return lista[i]
 
 
-def SVM():
-    df = preProcessarCsvs(CLASSES_CSV_FILENAME)
+def SVM(caminho):
+    df = preProcessarCsvs(caminho)
     # Separar dados e classe
-    X = df.drop(columns=["classe"])
     y = df["classe"]
+    X = df.drop(columns=["classe"])
 
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    # Pegue as primeiras 10 linhas para treino e o resto para teste
-    X_train = X_scaled[:10]
-    y_train = y[:10]
-    X_test = X_scaled[10:]
-    y_test = y[10:]
+    # Pegue as primeiras 10 linhas para teste e o resto para treino
+    X_train = X_scaled[10:]
+    y_train = y[10:]
+    X_test = X_scaled[:10]
+    y_test = y[:10]
+    # st.write("Classes encontradas:", y_train.unique())
 
     model = SVC(kernel="linear", random_state=42)
     model.fit(X_train, y_train)
+
 
     y_pred = model.predict(X_test)
     st.write("Acurácia:", accuracy_score(y_test, y_pred))
@@ -441,8 +443,8 @@ def preProcessarCsvs(caminho):
                 # st.write(nova_coluna)
                 df[nova_coluna] = df[col].apply(pegaMomentoHu, args=[i])
             df.drop(columns=[col], inplace=True)
-    df.drop('nome');
-    st.write(df)
+    df.drop(columns=['nome'], inplace=True);
+    return df;
     
 
 
