@@ -568,13 +568,32 @@ def carregar_e_processar_imagens(caminhos):
         imagens.append(img)
     return torch.stack(imagens)
 
+
+
+def salvar_modelo(model, epoch, caminho="modelos"):
+    """Salva o modelo em um arquivo com base no número da época (epoch)."""
+    if not os.path.exists(caminho):
+        os.makedirs(caminho)
+    nome_arquivo = os.path.join(caminho, f"modelo_epoch_{epoch}.pth")
+    torch.save(model.state_dict(), nome_arquivo)
+    print(f"Modelo salvo em {nome_arquivo}")
+    
+def carregar_modelo(model, caminho="modelos", epoch=0):
+    """Carrega o modelo a partir de um arquivo salvo na época especificada."""
+    nome_arquivo = os.path.join(caminho, f"modelo_epoch_{epoch}.pth")
+    if os.path.exists(nome_arquivo):
+        model.load_state_dict(torch.load(nome_arquivo))
+        print(f"Modelo carregado de {nome_arquivo}")
+    else:
+        print("Modelo não encontrado, usando modelo inicializado aleatoriamente.")
+    return model
+
 def crossValidationVGG16(csv):
     df = preProcessarCsvs(csv, dropNome=False)
     
     # Separar dados e classe
     y = df["classe"].values
     caminhos_imagens = df["nome"].values
-    # converte strings de y para 0 1
     y = [0 if classe == 'saudavel' else 1 for classe in y]
 
     # Carregar todas as imagens e processá-las
@@ -607,27 +626,29 @@ def crossValidationVGG16(csv):
     model = model.to(device)
     criterion = nn.CrossEntropyLoss()
 
-    for i in range(0, n_samples, batch_size):
-        # Garantir que o último lote tenha o mesmo tamanho, ignorando o último lote se necessário
-        torch.cuda.empty_cache()  # Libera a memória depois de cada lote
-        if i + batch_size > n_samples:
-            X_test = X_tensor[i:].to(device)
-            y_test = y_tensor[i:].to(device)
-            X_train = X_tensor[:i].to(device)
-            y_train = y_tensor[:i].to(device)
-        else:
-            # Dados de treino e teste
-            X_test = X_tensor[i:i+batch_size].to(device)
-            y_test = y_tensor[i:i+batch_size].to(device)
-            X_train = torch.cat([X_tensor[:i], X_tensor[i+batch_size:]]).to(device)
-            y_train = torch.cat([y_tensor[:i], y_tensor[i+batch_size:]]).to(device)
+    # Loop de validação cruzada
+    for epoch in range(10):  # Ajuste o número de épocas conforme necessário
+        # Carregar o modelo salvo no disco (se existir)
+        model = carregar_modelo(model, epoch=epoch)
+        
+        for i in range(0, n_samples, batch_size):
+            # Garantir que o último lote tenha o mesmo tamanho, ignorando o último lote se necessário
+            if i + batch_size > n_samples:
+                X_test = X_tensor[i:].to(device)
+                y_test = y_tensor[i:].to(device)
+                X_train = X_tensor[:i].to(device)
+                y_train = y_tensor[:i].to(device)
+            else:
+                # Dados de treino e teste
+                X_test = X_tensor[i:i+batch_size].to(device)
+                y_test = y_tensor[i:i+batch_size].to(device)
+                X_train = torch.cat([X_tensor[:i], X_tensor[i+batch_size:]]).to(device)
+                y_train = torch.cat([y_tensor[:i], y_tensor[i+batch_size:]]).to(device)
 
-        # Treinamento
-        optimizer = optim.Adam(model.parameters(), lr=0.001)
-        scaler = torch.cuda.amp.GradScaler()
-        model.train()
-        torch.cuda.empty_cache()  # Libera a memória depois de cada lote
-        for epoch in range(1):  # Ajuste o número de épocas conforme necessário
+            # Treinamento
+            optimizer = optim.Adam(model.parameters(), lr=0.001)
+            scaler = torch.cuda.amp.GradScaler()
+            model.train()
             with torch.cuda.amp.autocast():
                 outputs = model(X_train)
                 loss = criterion(outputs, y_train)
@@ -635,6 +656,10 @@ def crossValidationVGG16(csv):
             scaler.step(optimizer)
             scaler.update()
             torch.cuda.empty_cache()  # Libera a memória depois de cada lote
+
+            # Salvar o modelo a cada 10 épocas
+            if (epoch + 1) % 1 == 0:
+                salvar_modelo(model, epoch=epoch)
 
         # Predição
         model.eval()
@@ -664,7 +689,6 @@ def crossValidationVGG16(csv):
 
         sensibilidades.append(sensibilidade)
         especificidades.append(especificidade)
-        torch.cuda.empty_cache()  # Libera a memória depois de cada lote
 
     # Resultados finais
     print("Média de Acurácias:", np.mean(acuracias))
@@ -675,6 +699,7 @@ def crossValidationVGG16(csv):
     matriz_confusao_media = np.sum(matrizes_confusao, axis=0)
     print("Matriz de Confusão Média:")
     plot_matriz_confusao(matriz_confusao_media)
+
 
 
 
