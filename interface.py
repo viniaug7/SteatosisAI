@@ -6,7 +6,7 @@
 #ND = VGG16
 # Como rodar:
 # Use python 3.10
-# pip install streamlit streamlit-cropper scipy numpy matplotlib setuptools opencv-python streamlit_image_zoom scikit-image scikit-learn torch
+# pip install streamlit streamlit-cropper scipy numpy matplotlib setuptools opencv-python streamlit_image_zoom scikit-image scikit-learn torch torchvision
 # streamlit run interface.py
 import streamlit as st
 from random import randint
