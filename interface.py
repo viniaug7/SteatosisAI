@@ -626,12 +626,15 @@ def crossValidationVGG16(csv):
     model = model.to(device)
     criterion = nn.CrossEntropyLoss()
 
-    # Loop de validação cruzada
-    for epoch in range(10):  # Ajuste o número de épocas conforme necessário
+    for epoch in range(10): 
+        print('Iniciando época: ', epoch + 1)
         # Carregar o modelo salvo no disco (se existir)
         model = carregar_modelo(model, epoch=epoch)
         
+        # Loop de validação cruzada
+        # (Fazemos todas as validação cruzadas para a epoch 1, depois para epoch 2....)
         for i in range(0, n_samples, batch_size):
+            print('Iniciando crossvalidation batch: ', i // batch_size + 1)
             # Garantir que o último lote tenha o mesmo tamanho, ignorando o último lote se necessário
             if i + batch_size > n_samples:
                 X_test = X_tensor[i:].to(device)
@@ -647,9 +650,9 @@ def crossValidationVGG16(csv):
 
             # Treinamento
             optimizer = optim.Adam(model.parameters(), lr=0.001)
-            scaler = torch.cuda.amp.GradScaler()
+            scaler = torch.cuda.amp.GradScaler() # Pra usear float32 em vez de 64
             model.train()
-            with torch.cuda.amp.autocast():
+            with torch.cuda.amp.autocast(): # pra usar float32 em vez de 64
                 outputs = model(X_train)
                 loss = criterion(outputs, y_train)
             scaler.scale(loss).backward()
@@ -661,44 +664,51 @@ def crossValidationVGG16(csv):
             if (epoch + 1) % 1 == 0:
                 salvar_modelo(model, epoch=epoch)
 
-        # Predição
-        model.eval()
-        with torch.no_grad():
-            y_pred = model(X_test)
-            y_pred_classes = torch.argmax(y_pred, axis=1).cpu().numpy()
+            # Predição
+            model.eval()
+            with torch.no_grad():
+                y_pred = model(X_test)
+                y_pred_classes = torch.argmax(y_pred, axis=1).cpu().numpy()
 
-        # Acurácia e relatórios
-        acuracias.append(accuracy_score(y_test.cpu().numpy(), y_pred_classes))
-        relatorios.append(classification_report(y_test.cpu().numpy(), y_pred_classes))
+            # Acurácia e relatórios
+            acuracias.append(accuracy_score(y_test.cpu().numpy(), y_pred_classes))
+            relatorios.append(classification_report(y_test.cpu().numpy(), y_pred_classes))
 
-        # Matriz de confusão
-        matriz_confusao = confusion_matrix(y_test.cpu().numpy(), y_pred_classes)
-        matrizes_confusao.append(matriz_confusao)
+            # Matriz de confusão
+            matriz_confusao = confusion_matrix(y_test.cpu().numpy(), y_pred_classes)
+            matrizes_confusao.append(matriz_confusao)
 
-        # Sensibilidade e especificidade
-        if matriz_confusao.shape == (2, 2):
-            tp = matriz_confusao[1, 1]
-            tn = matriz_confusao[0, 0]
-            fp = matriz_confusao[0, 1]
-            fn = matriz_confusao[1, 0]
+            # Sensibilidade e especificidade
+            if matriz_confusao.shape == (2, 2):
+                tp = matriz_confusao[1, 1]
+                tn = matriz_confusao[0, 0]
+                fp = matriz_confusao[0, 1]
+                fn = matriz_confusao[1, 0]
 
-            sensibilidade = tp / (tp + fn) if tp + fn > 0 else 0
-            especificidade = tn / (tn + fp) if tn + fp > 0 else 0
-        else:
-            sensibilidade = especificidade = 0
+                sensibilidade = tp / (tp + fn) if tp + fn > 0 else 0
+                especificidade = tn / (tn + fp) if tn + fp > 0 else 0
+            else:
+                sensibilidade = especificidade = 0
 
-        sensibilidades.append(sensibilidade)
-        especificidades.append(especificidade)
+            sensibilidades.append(sensibilidade)
+            especificidades.append(especificidade)
 
-    # Resultados finais
-    print("Média de Acurácias:", np.mean(acuracias))
-    print("Média de Sensibilidade:", np.mean(sensibilidades))
-    print("Média de Especificidade:", np.mean(especificidades))
+        # Resultados da epoch
+        st.title(f"Resultados da Validação Cruzada Epoch {epoch + 1}")
+        st.write("Média de Acurácias:", np.mean(acuracias))
+        st.write("Média de Sensibilidade:", np.mean(sensibilidades))
+        st.write("Média de Especificidade:", np.mean(especificidades))
 
-    # Matriz de confusão média
-    matriz_confusao_media = np.sum(matrizes_confusao, axis=0)
-    print("Matriz de Confusão Média:")
-    plot_matriz_confusao(matriz_confusao_media)
+        # Matriz de confusão média
+        matriz_confusao_media = np.sum(matrizes_confusao, axis=0)
+        st.write("Matriz de Confusão Média:")
+        plot_matriz_confusao(matriz_confusao_media)
+
+    st.title("Resultados Finais")
+    st.write("Média de Acurácias:", np.mean(acuracias))
+    st.write("Média de Sensibilidade:", np.mean(sensibilidades))
+    st.write("Média de Especificidade:", np.mean(especificidades))
+
 
 
 
