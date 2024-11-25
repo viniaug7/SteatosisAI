@@ -655,7 +655,8 @@ def crossValidationVGG16(csv):
 
             # Treinamento
             if (not modeloJaTreinadoNoHD):
-                criterion = nn.CrossEntropyLoss() # A funçõ de perda / loss
+                pesoDasClasses = torch.tensor([38/55, 17/55], device=device)
+                criterion = nn.CrossEntropyLoss(weight=pesoDasClasses) # A funçõ de perda / loss
                 optimizer = optim.Adam(model.parameters(), lr=0.001) # Otimizador
 
                 model.train()
