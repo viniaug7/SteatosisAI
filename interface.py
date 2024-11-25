@@ -22,6 +22,7 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler, MaxAbsScaler, MinMaxScaler
+from torch.cuda.amp import autocast, GradScaler  # Importa o autocast e o GradScaler
 from PIL import Image
 from streamlit_image_zoom import image_zoom
 from skimage.feature import graycomatrix, graycoprops
@@ -616,11 +617,11 @@ def crossValidationVGG16(csv):
 
     # Modelo pré-treinado VGG16
     model = models.vgg16(pretrained=True)
-    model.features[0] = nn.Conv2d(3, 64, kernel_size=3, padding=1)  # Ajuste da camada convolucional para 3 canais
+    # model.features[0] = nn.Conv2d(3, 64, kernel_size=3, padding=1)  # Ajuste da camada convolucional para 3 canais
     model.classifier[6] = nn.Linear(4096, len(set(y)))  # Ajustando a saída para o número de classes
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = model.to(device)
-    criterion = nn.CrossEntropyLoss() # A funçõ de perda
 
     for epoch in range(10): 
         statusContainer.text(f"Treinando modelo na época {epoch + 1}...")
@@ -634,37 +635,44 @@ def crossValidationVGG16(csv):
         
         # Loop de validação cruzada
         # (Fazemos todas as validação cruzadas para a epoch 1, depois para epoch 2....)
+        lossacumulada = 0.0
         for i in range(0, n_samples, batch_size):
             # Falar em que época, em que batch e quantos batches faltam
             statusContainer.text(f"Época {epoch + 1}, Cross validation {i // batch_size}/{n_samples // batch_size}...")
             # fazer com que o último lote tenha o mesmo tamanho, ignorando o último lote se n tiver
             if i + batch_size > n_samples:
-                X_test = X_tensor[i:].to(device)
+                X_test = X_tensor[i:].to(device) # Move as imagens para a GPU
                 y_test = y_tensor[i:].to(device)
                 X_train = X_tensor[:i].to(device)
                 y_train = y_tensor[:i].to(device)
             else:
-                # Dados de treino e teste
                 X_test = X_tensor[i:i+batch_size].to(device)
                 y_test = y_tensor[i:i+batch_size].to(device)
                 X_train = torch.cat([X_tensor[:i], X_tensor[i+batch_size:]]).to(device)
                 y_train = torch.cat([y_tensor[:i], y_tensor[i+batch_size:]]).to(device)
+            torch.cuda.empty_cache()
+
 
             # Treinamento
-            optimizer = optim.Adam(model.parameters(), lr=0.001) # Otimizador
-            scaler = torch.cuda.amp.GradScaler() # Pra usear float16 em vez de 32
-            model.train()
-            with torch.cuda.amp.autocast(): # pra usar float16 em vez de 32
-                outputs = model(X_train)
-                loss = criterion(outputs, y_train)
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-            torch.cuda.empty_cache()  # Libera a memória depois de cada lote
+            if (not modeloJaTreinadoNoHD):
+                criterion = nn.CrossEntropyLoss() # A funçõ de perda / loss
+                optimizer = optim.Adam(model.parameters(), lr=0.001) # Otimizador
 
-            # Salvar o modelo a cada 10 épocas
-            if (epoch + 1) % 1 == 0:
-                salvar_modelo(model, epoch=epoch)
+                model.train()
+                scaler = GradScaler()
+                secondStatusContainer.text(f"Loss acumulada média: {lossacumulada / (i // batch_size + 1)}")
+                optimizer.zero_grad();
+                
+                # With autocast faz com que as operações dentro do bloco sejam feitas com precisão float16 em vez de float32 (pra nao estourar a memoria)
+                with autocast(): 
+                    outputs = model(X_train)
+                    loss = criterion(outputs, y_train) # Calcula a perda entre previsao e realidade
+                # Backward é a parte de calcular os gradientes com base na perda
+                scaler.scale(loss).backward() # O uso do float16 pode fazer a gnt perder precisão (underflow), o gradscaler aumenta os gradientes/pesos que a loss indica para isso nao acontecer
+                scaler.step(optimizer)  # Atualiza os pesos
+                scaler.update()
+                lossacumulada += loss.item()
+                torch.cuda.empty_cache()
 
             # Predição
             model.eval()
@@ -695,9 +703,10 @@ def crossValidationVGG16(csv):
             print(especificidades)
             sensibilidades.append(sensibilidade)
             especificidades.append(especificidade)
-
-        # Resultados da epoch
         
+        
+        salvar_modelo(model, epoch=epoch)
+        # Resultados da epoch
         st.title(f"Resultados da Validação Cruzada Epoch {epoch + 1}")
         st.write("Média de Acurácias:", np.mean(acuracias))
         st.write("Média de Sensibilidade:", np.mean(sensibilidades))
