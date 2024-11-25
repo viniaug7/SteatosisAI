@@ -590,6 +590,7 @@ def carregar_modelo(model, caminho="modelos", epoch=0):
 
 def crossValidationVGG16(csv):
     df = preProcessarCsvs(csv, dropNome=False)
+    statusContainer = st.empty()
     
     # Separar dados e classe
     y = df["classe"].values
@@ -627,14 +628,15 @@ def crossValidationVGG16(csv):
     criterion = nn.CrossEntropyLoss()
 
     for epoch in range(10): 
-        print('Iniciando época: ', epoch + 1)
+        statusContainer.text(f"Treinando modelo na época {epoch + 1}...")
         # Carregar o modelo salvo no disco (se existir)
         model = carregar_modelo(model, epoch=epoch)
         
         # Loop de validação cruzada
         # (Fazemos todas as validação cruzadas para a epoch 1, depois para epoch 2....)
         for i in range(0, n_samples, batch_size):
-            print('Iniciando crossvalidation batch: ', i // batch_size + 1)
+            # Falar em que época, em que batch e quantos batches faltam
+            statusContainer.text(f"Época {epoch + 1}, Cross validation {i // batch_size}/{n_samples // batch_size}...")
             # Garantir que o último lote tenha o mesmo tamanho, ignorando o último lote se necessário
             if i + batch_size > n_samples:
                 X_test = X_tensor[i:].to(device)
@@ -674,10 +676,15 @@ def crossValidationVGG16(csv):
             acuracias.append(accuracy_score(y_test.cpu().numpy(), y_pred_classes))
             relatorios.append(classification_report(y_test.cpu().numpy(), y_pred_classes))
 
+            print(relatorios)
             # Matriz de confusão
             matriz_confusao = confusion_matrix(y_test.cpu().numpy(), y_pred_classes)
+            if matriz_confusao.shape == (1, 1):
+                matriz_confusao = np.array([[matriz_confusao[0, 0], 0], [0, 0]])
+
             matrizes_confusao.append(matriz_confusao)
 
+        
             # Sensibilidade e especificidade
             if matriz_confusao.shape == (2, 2):
                 tp = matriz_confusao[1, 1]
@@ -690,10 +697,13 @@ def crossValidationVGG16(csv):
             else:
                 sensibilidade = especificidade = 0
 
+            print(sensibilidade)
+            print(especificidades)
             sensibilidades.append(sensibilidade)
             especificidades.append(especificidade)
 
         # Resultados da epoch
+        
         st.title(f"Resultados da Validação Cruzada Epoch {epoch + 1}")
         st.write("Média de Acurácias:", np.mean(acuracias))
         st.write("Média de Sensibilidade:", np.mean(sensibilidades))
