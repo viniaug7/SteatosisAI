@@ -426,6 +426,7 @@ def plot_matriz_confusao(matriz_confusao):
     st.pyplot(plt);
     plt.clf();
 
+
 def crossValidationSVM(csv):
     df = preProcessarCsvs(csv)
     # Separar dados e classe
@@ -463,28 +464,18 @@ def crossValidationSVM(csv):
         relatorios.append(classification_report(y_test, y_pred))
 
         # Matriz de confusão
-        matriz_confusao = confusion_matrix(y_test,y_pred)
+        matriz_confusao = confusion_matrix(y_test,y_pred, labels=[0, 1])
         
-        # Se a matriz de confusão for 1x1, transforme em 2x2 com valores zero nas posições adequadas
-        if matriz_confusao.shape == (1, 1):
-            matriz_confusao = np.array([[matriz_confusao[0, 0], 0], [0, 0]])
         
         matrizes_confusao.append(matriz_confusao)
 
-        # Verificar o tamanho da matriz de confusão
-        if matriz_confusao.shape[0] > 1 and matriz_confusao.shape[1] > 1:
-            # Se a matriz de confusão for 2x2, calcule sensibilidade e especificidade
-            tp = matriz_confusao[1, 1]  # True Positives
-            tn = matriz_confusao[0, 0]  # True Negatives
-            fp = matriz_confusao[0, 1]  # False Positives
-            fn = matriz_confusao[1, 0]  # False Negatives
+        tp = matriz_confusao[1, 1]  # True Positives
+        tn = matriz_confusao[0, 0]  # True Negatives
+        fp = matriz_confusao[0, 1]  # False Positives
+        fn = matriz_confusao[1, 0]  # False Negatives
 
-            sensibilidade = tp / (tp + fn) if tp + fn > 0 else 0
-            especificidade = tn / (tn + fp) if tn + fp > 0 else 0
-        else:
-            # Se a matriz for 1x1, sensibilidade e especificidade não podem ser calculadas
-            sensibilidade = 0
-            especificidade = 0
+        sensibilidade = tp / (tp + fn) if tp + fn > 0 else 0
+        especificidade = tn / (tn + fp) if tn + fp > 0 else 0
         sensibilidades.append(sensibilidade)
         especificidades.append(especificidade)
 
@@ -578,6 +569,9 @@ def salvar_modelo(model, epoch, caminho="modelos"):
     torch.save(model.state_dict(), nome_arquivo)
     print(f"Modelo salvo em {nome_arquivo}")
     
+def modeloJaExiste(model, caminho='modelos', epoch=0):
+    nome_arquivo = os.path.join(caminho, f"modelo_epoch_{epoch}.pth")
+    return os.path.exists(nome_arquivo)
 def carregar_modelo(model, caminho="modelos", epoch=0):
     """Carrega o modelo a partir de um arquivo salvo na época especificada."""
     nome_arquivo = os.path.join(caminho, f"modelo_epoch_{epoch}.pth")
@@ -591,11 +585,12 @@ def carregar_modelo(model, caminho="modelos", epoch=0):
 def crossValidationVGG16(csv):
     df = preProcessarCsvs(csv, dropNome=False)
     statusContainer = st.empty()
+    secondStatusContainer = st.empty();
     
     # Separar dados e classe
     y = df["classe"].values
     caminhos_imagens = df["nome"].values
-    y = [0 if classe == 'saudavel' else 1 for classe in y]
+    y = [1 if classe == 'saudavel' else 0 for classe in y]
 
     # Carregar todas as imagens e processá-las
     X_tensor = carregar_e_processar_imagens(caminhos_imagens)
@@ -625,19 +620,24 @@ def crossValidationVGG16(csv):
     model.classifier[6] = nn.Linear(4096, len(set(y)))  # Ajustando a saída para o número de classes
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = model.to(device)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss() # A funçõ de perda
 
     for epoch in range(10): 
         statusContainer.text(f"Treinando modelo na época {epoch + 1}...")
         # Carregar o modelo salvo no disco (se existir)
         model = carregar_modelo(model, epoch=epoch)
+        modeloJaTreinadoNoHD = modeloJaExiste(model, epoch=epoch)
+        if (modeloJaTreinadoNoHD):
+            secondStatusContainer.text(f"Usando modelo já treinado na época {epoch + 1}...")
+        else:
+            secondStatusContainer.text(f"Treinando modelo na época {epoch + 1}...")
         
         # Loop de validação cruzada
         # (Fazemos todas as validação cruzadas para a epoch 1, depois para epoch 2....)
         for i in range(0, n_samples, batch_size):
             # Falar em que época, em que batch e quantos batches faltam
             statusContainer.text(f"Época {epoch + 1}, Cross validation {i // batch_size}/{n_samples // batch_size}...")
-            # Garantir que o último lote tenha o mesmo tamanho, ignorando o último lote se necessário
+            # fazer com que o último lote tenha o mesmo tamanho, ignorando o último lote se n tiver
             if i + batch_size > n_samples:
                 X_test = X_tensor[i:].to(device)
                 y_test = y_tensor[i:].to(device)
@@ -651,10 +651,10 @@ def crossValidationVGG16(csv):
                 y_train = torch.cat([y_tensor[:i], y_tensor[i+batch_size:]]).to(device)
 
             # Treinamento
-            optimizer = optim.Adam(model.parameters(), lr=0.001)
-            scaler = torch.cuda.amp.GradScaler() # Pra usear float32 em vez de 64
+            optimizer = optim.Adam(model.parameters(), lr=0.001) # Otimizador
+            scaler = torch.cuda.amp.GradScaler() # Pra usear float16 em vez de 32
             model.train()
-            with torch.cuda.amp.autocast(): # pra usar float32 em vez de 64
+            with torch.cuda.amp.autocast(): # pra usar float16 em vez de 32
                 outputs = model(X_train)
                 loss = criterion(outputs, y_train)
             scaler.scale(loss).backward()
@@ -676,26 +676,20 @@ def crossValidationVGG16(csv):
             acuracias.append(accuracy_score(y_test.cpu().numpy(), y_pred_classes))
             relatorios.append(classification_report(y_test.cpu().numpy(), y_pred_classes))
 
-            print(relatorios)
             # Matriz de confusão
-            matriz_confusao = confusion_matrix(y_test.cpu().numpy(), y_pred_classes)
-            if matriz_confusao.shape == (1, 1):
-                matriz_confusao = np.array([[matriz_confusao[0, 0], 0], [0, 0]])
+            matriz_confusao = confusion_matrix(y_test.cpu().numpy(), y_pred_classes, labels=[0, 1])          
 
             matrizes_confusao.append(matriz_confusao)
 
         
             # Sensibilidade e especificidade
-            if matriz_confusao.shape == (2, 2):
-                tp = matriz_confusao[1, 1]
-                tn = matriz_confusao[0, 0]
-                fp = matriz_confusao[0, 1]
-                fn = matriz_confusao[1, 0]
+            tp = matriz_confusao[1, 1]
+            tn = matriz_confusao[0, 0]
+            fp = matriz_confusao[0, 1]
+            fn = matriz_confusao[1, 0]
 
-                sensibilidade = tp / (tp + fn) if tp + fn > 0 else 0
-                especificidade = tn / (tn + fp) if tn + fp > 0 else 0
-            else:
-                sensibilidade = especificidade = 0
+            sensibilidade = tp / (tp + fn) if tp + fn > 0 else 0
+            especificidade = tn / (tn + fp) if tn + fp > 0 else 0
 
             print(sensibilidade)
             print(especificidades)
