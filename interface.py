@@ -739,10 +739,14 @@ def crossValidationVGG16(csv):
     st.write("Média de Especificidade:", np.mean(especificidades))
     st.write("Média de Tempos de Treinamento:", np.mean(tempos_epoch))
 
-    dfPraPlotar = pd.DataFrame()
-    dfPraPlotar['Acurácia Média Teste'] = np.mean(acuracias)
-    dfPraPlotar['Acurácia Média Treino'] = np.mean(acuracias_treino)
-    st.line_chart(dfPraPlotar)
+    # Plotar acuracias em um gráfico
+    plt.plot(acuracias, label='Acurácia (Teste)')
+    plt.plot(acuracias_treino, label='Acurácia (Treino)')
+    plt.xlabel('Época')
+    plt.ylabel('Acurácia')
+    plt.legend()
+    st.pyplot(plt)
+    plt.clf()
 
 
 
