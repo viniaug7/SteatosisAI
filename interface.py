@@ -614,6 +614,7 @@ def crossValidationVGG16(csv):
 
     # Métricas gerais
     acuracias = []
+    relatorios = []
     matrizes_confusao = []
     especificidades = []
     sensibilidades = []
@@ -621,7 +622,7 @@ def crossValidationVGG16(csv):
     # Modelo pré-treinado VGG16
     model = models.vgg16(weights=models.VGG16_Weights.IMAGENET1K_V1)  # Carrega o modelo sem a camada densa no topo
     model.classifier[6] = nn.Linear(4096, len(set(y)))  # Ajustando a saída para o número de classes
-    model.classifier[5] = nn.Dropout(0.5) # Dropout para regularização
+    model.classifier[5] = nn.Dropout(0.8) # Dropout para regularização
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = model.to(device)
@@ -629,7 +630,7 @@ def crossValidationVGG16(csv):
     # converte para float antes
     pesoDasClasses = torch.tensor(weightsCalculadosAutomaticos, dtype=torch.float32).to(device)
     criterion = nn.CrossEntropyLoss(weight=pesoDasClasses) # A funçõ de perda / loss
-    optimizer = optim.Adam(model.parameters(), lr=0.005) # Otimizador, lr é taxa de aprendizado
+    optimizer = optim.SGD(model.parameters(), lr=0.05, momentum=0.2) # Otimizador, lr é taxa de aprendizado
 
     for epoch in range(10): 
         acuracias_epoch = []
@@ -705,10 +706,6 @@ def crossValidationVGG16(csv):
         st.write("Média de Acurácias:", np.mean(acuracias_epoch))
         st.write("Média de Sensibilidade:", np.mean(sensibilidades_epoch))
         st.write("Média de Especificidade:", np.mean(especificidades_epoch))
-        acuracias.append(np.mean(acuracias_epoch))
-        sensibilidades.append(np.mean(sensibilidades_epoch))
-        especificidades.append(np.mean(especificidades_epoch))
-        matrizes_confusao.append(matrizes_confusao_epoch)
 
         # Matriz de confusão média
         matriz_confusao_media = np.sum(matrizes_confusao_epoch, axis=0)
