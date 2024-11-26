@@ -633,7 +633,8 @@ def crossValidationVGG16(csv):
         especificidades_epoch = []
         statusContainer.text(f"Treinando modelo na época {epoch + 1}...")
         # Carregar o modelo salvo no disco (se existir)
-        modeloJaTreinadoNoHD = modeloJaExiste(epoch=epoch)
+        # modeloJaTreinadoNoHD = modeloJaExiste(epoch=epoch)
+        modeloJaTreinadoNoHD = False;
         # carregarEpoch = epoch
         # if (modeloJaTreinadoNoHD):
         #     carregarEpoch = epoch
