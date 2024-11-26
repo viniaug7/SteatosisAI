@@ -799,7 +799,7 @@ with classificarVGGTab:
 
         model = models.vgg16(weights=models.VGG16_Weights.IMAGENET1K_V1)  # Carrega o modelo sem a camada densa no topo
         model.classifier[6] = nn.Linear(4096, len(set(y)))  # Ajustando a saída para o número de classes
-        model = carregar_modelo(model, epoch=10)
+        model = carregar_modelo(model, epoch=9)
 
         # Carregar todas as imagens e processá-las
         X_tensor = carregar_e_processar_imagens(caminhos_imagens)
