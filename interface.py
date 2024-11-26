@@ -607,7 +607,7 @@ def crossValidationVGG16(csv):
     assert X_tensor.shape[0] == len(y_tensor), "O número de imagens e rótulos não coincide!"
 
     # Divisão em batches para validação cruzada
-    batch_size = 200
+    batch_size = 10
     n_samples = len(X_tensor)
 
     # Verificar se o número de amostras é divisível pelo batch_size
@@ -633,7 +633,7 @@ def crossValidationVGG16(csv):
     criterion = nn.CrossEntropyLoss(weight=pesoDasClasses) # A funçõ de perda / loss
     optimizer = optim.SGD(model.parameters(), lr=0.0005, momentum=0.2) # Otimizador, lr é taxa de aprendizado
 
-    for epoch in range(2): 
+    for epoch in range(10): 
         acuracias_epoch = []
         acuracias_treino_epoch = []
         relatorios_epoch = []
