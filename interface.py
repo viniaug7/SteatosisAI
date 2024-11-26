@@ -399,6 +399,8 @@ def SVM(X_train, y_train, X_test):#poli 100|rbf10|rbf100 -> 83
     # Treinamento do modelo
     model = SVC(C=10,kernel="linear", class_weight={0:38/55, 1:17/55},random_state=42)#kernel="linear", random_state=42{55/17,55/38}
     model.fit(X_train, y_train)
+    if not os.path.exists('modelos'):
+        os.makedirs('modelos')
     with open('modelos/modelo_svm.pkl', 'wb') as file:
         pickle.dump(model, file)
 
@@ -630,7 +632,7 @@ def crossValidationVGG16(csv):
     # converte para float antes
     pesoDasClasses = torch.tensor(weightsCalculadosAutomaticos, dtype=torch.float32).to(device)
     criterion = nn.CrossEntropyLoss(weight=pesoDasClasses) # A funçõ de perda / loss
-    optimizer = optim.SGD(model.parameters(), lr=0.05, momentum=0.2) # Otimizador, lr é taxa de aprendizado
+    optimizer = optim.SGD(model.parameters(), lr=0.0005, momentum=0.2) # Otimizador, lr é taxa de aprendizado
 
     for epoch in range(10): 
         acuracias_epoch = []
@@ -706,6 +708,10 @@ def crossValidationVGG16(csv):
         st.write("Média de Acurácias:", np.mean(acuracias_epoch))
         st.write("Média de Sensibilidade:", np.mean(sensibilidades_epoch))
         st.write("Média de Especificidade:", np.mean(especificidades_epoch))
+        acuracias.append(np.mean(acuracias_epoch))
+        sensibilidades.append(np.mean(sensibilidades_epoch))
+        especificidades.append(np.mean(especificidades_epoch))
+        matrizes_confusao.append(matrizes_confusao_epoch)
 
         # Matriz de confusão média
         matriz_confusao_media = np.sum(matrizes_confusao_epoch, axis=0)
@@ -716,6 +722,7 @@ def crossValidationVGG16(csv):
     st.write("Média de Acurácias:", np.mean(acuracias))
     st.write("Média de Sensibilidade:", np.mean(sensibilidades))
     st.write("Média de Especificidade:", np.mean(especificidades))
+    plot_matriz_confusao(np.sum(matrizes_confusao, axis=0))  # Exibindo a matriz de confusão média
 
 
 
