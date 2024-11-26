@@ -625,7 +625,7 @@ def crossValidationVGG16(csv):
     criterion = nn.CrossEntropyLoss(weight=pesoDasClasses) # A funçõ de perda / loss
     optimizer = optim.Adam(model.parameters(), lr=0.01) # Otimizador
 
-    for epoch in range(2): 
+    for epoch in range(10): 
         acuracias_epoch = []
         relatorios_epoch = []
         matrizes_confusao_epoch = []
