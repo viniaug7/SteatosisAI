@@ -552,8 +552,8 @@ with treinarSVMTab:
 
 def carregar_e_processar_imagens(caminhos):
     transform = transforms.Compose([
-        transforms.Resize((56, 56)),  # Redimensiona para 224x224
-        transforms.Grayscale(num_output_channels=3),  # Converte para 3 canais (escala de cinza com 3 canais)
+        transforms.Resize((56, 56)),  # Redimensiona pra 56x56 porque o 224x224 explode a RAM da GPU
+        transforms.Grayscale(num_output_channels=3),  # Converte para 3 canais (escala de cinza com 3 canais) (porque o VGGtrabalha com 3 canais)
         transforms.ToTensor(),  # Converte para tensor
         transforms.Normalize([0.485, 0.485, 0.485], [0.229, 0.229, 0.229])  # Normalização padrão para VGG16
     ])
@@ -728,28 +728,31 @@ with treinarVGGTab:
 
 
 with classificarSVMTab:
-    with open('modelos/modelo_svm.pkl', 'rb') as file:
-        modelo_carregado = pickle.load(file)
-    arquivo = st.file_uploader("Escolha o arquivo CSV para classificar com SVM", type=["csv"])
-    if (arquivo):
-        df = preProcessarCsvs(arquivo)
-        comNome = preProcessarCsvs(arquivo, dropNome=False)
-        # Separar dados e classe
-        y = df["classe"].replace({'saudavel': 1, 'esteatose': 0})
-        X = df.drop(columns=["classe"])
+    if (os.path.exists('modelos/modelo_svm.pkl')):
+        with open('modelos/modelo_svm.pkl', 'rb') as file:
+            modelo_carregado = pickle.load(file)
+        arquivo = st.file_uploader("Escolha o arquivo CSV para classificar com SVM", type=["csv"])
+        if (arquivo):
+            df = preProcessarCsvs(arquivo)
+            comNome = preProcessarCsvs(arquivo, dropNome=False)
+            # Separar dados e classe
+            y = df["classe"].replace({'saudavel': 1, 'esteatose': 0})
+            X = df.drop(columns=["classe"])
 
-        scaler = MinMaxScaler()
-        X_scaled = scaler.fit_transform(X)
-        # Fazer tabela somente com csv[nome] predição, e se ela estava certa
-        y_pred = modelo_carregado.predict(X_scaled)
-        # Criar df novo para mostrar
-        novoDf = pd.DataFrame()
-        novoDf["Nome"] = comNome["nome"]
-        novoDf["Classe Real"] = df["classe"]
-        # Transfomrar o y_pred de volta pra saudavel e esteatose
-        novoDf["Classe Predita"] = ['saudavel' if pred == 1 else 'esteatose' for pred in y_pred] 
-        novoDf["Correto"] = novoDf["Classe Real"] == novoDf["Classe Predita"]
-        st.write(novoDf)
+            scaler = MinMaxScaler()
+            X_scaled = scaler.fit_transform(X)
+            # Fazer tabela somente com csv[nome] predição, e se ela estava certa
+            y_pred = modelo_carregado.predict(X_scaled)
+            # Criar df novo para mostrar
+            novoDf = pd.DataFrame()
+            novoDf["Nome"] = comNome["nome"]
+            novoDf["Classe Real"] = df["classe"]
+            # Transfomrar o y_pred de volta pra saudavel e esteatose
+            novoDf["Classe Predita"] = ['saudavel' if pred == 1 else 'esteatose' for pred in y_pred] 
+            novoDf["Correto"] = novoDf["Classe Real"] == novoDf["Classe Predita"]
+            st.write(novoDf)
+    else:
+        st.error("Modelo SVM não treinado ainda")
 
 
 with classificarVGGTab:
