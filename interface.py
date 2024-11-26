@@ -679,8 +679,15 @@ def crossValidationVGG16(csv):
             lossacumulada += loss.item()
             secondStatusContainer.text(f"Loss acumulada média: {lossacumulada / (i // batch_size + 1)}")
             torch.cuda.empty_cache()
+            
+            # Acurácia de treino
+            _, predito_treino = torch.max(outputs, 1)
+            predito_correto = (predito_treino == y_train).sum().item()
+            predito_total = y_train.size(0)
+            acuracia_treino = predito_correto / predito_total
+            acuracias_treino_epoch.append(acuracia_treino)
 
-            # Predição
+            # Predição do teste
             model.eval()
             with torch.no_grad():
                 y_pred = model(X_test)
@@ -698,7 +705,6 @@ def crossValidationVGG16(csv):
             sensibilidade = tp / (tp + fn) if tp + fn > 0 else 0
             especificidade = tn / (tn + fp) if tn + fp > 0 else 0
 
-            acuracias_treino_epoch = accuracy_score(y_train.cpu().numpy(), torch.argmax(model(X_train), axis=1).cpu().numpy())
             acuracias_epoch.append(accuracy_score(y_test.cpu().numpy(), y_pred_classes))
             relatorios_epoch.append(classification_report(y_test.cpu().numpy(), y_pred_classes))
             matrizes_confusao_epoch.append(matriz_confusao)
