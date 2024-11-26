@@ -570,7 +570,7 @@ def salvar_modelo(model, epoch, caminho="modelos"):
     torch.save(model.state_dict(), nome_arquivo)
     print(f"Modelo salvo em {nome_arquivo}")
     
-def modeloJaExiste(model, caminho='modelos', epoch=0):
+def modeloJaExiste(caminho='modelos', epoch=0):
     nome_arquivo = os.path.join(caminho, f"modelo_epoch_{epoch}.pth")
     return os.path.exists(nome_arquivo)
 def carregar_modelo(model, caminho="modelos", epoch=0):
@@ -616,22 +616,37 @@ def crossValidationVGG16(csv):
     sensibilidades = []
 
     # Modelo pré-treinado VGG16
-    model = models.vgg16(pretrained=True)
-    # model.features[0] = nn.Conv2d(3, 64, kernel_size=3, padding=1)  # Ajuste da camada convolucional para 3 canais
+    model = models.vgg16(weights=models.VGG16_Weights.IMAGENET1K_V1)  # Carrega o modelo sem a camada densa no topo
     model.classifier[6] = nn.Linear(4096, len(set(y)))  # Ajustando a saída para o número de classes
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = model.to(device)
+    pesoDasClasses = torch.tensor([38/55, 17/55], device=device)
+    criterion = nn.CrossEntropyLoss(weight=pesoDasClasses) # A funçõ de perda / loss
+    optimizer = optim.Adam(model.parameters(), lr=0.01) # Otimizador
 
-    for epoch in range(10): 
+    for epoch in range(2): 
+        acuracias_epoch = []
+        relatorios_epoch = []
+        matrizes_confusao_epoch = []
+        sensibilidades_epoch = []
+        especificidades_epoch = []
         statusContainer.text(f"Treinando modelo na época {epoch + 1}...")
         # Carregar o modelo salvo no disco (se existir)
-        model = carregar_modelo(model, epoch=epoch)
-        modeloJaTreinadoNoHD = modeloJaExiste(model, epoch=epoch)
-        if (modeloJaTreinadoNoHD):
-            secondStatusContainer.text(f"Usando modelo já treinado na época {epoch + 1}...")
-        else:
-            secondStatusContainer.text(f"Treinando modelo na época {epoch + 1}...")
+        modeloJaTreinadoNoHD = modeloJaExiste(epoch=epoch)
+        # carregarEpoch = epoch
+        # if (modeloJaTreinadoNoHD):
+        #     carregarEpoch = epoch
+        # elif (epoch == 0):
+        #     carregarEpoch = 0
+        # elif (modeloJaExiste(epoch=epoch-1)):
+        #     carregarEpoch = epoch-1
+
+        # model = carregar_modelo(model, epoch=carregarEpoch)
+        # if (modeloJaTreinadoNoHD):
+        #     secondStatusContainer.text(f"Usando modelo já treinado na época {epoch + 1}...")
+        # else:
+        #     secondStatusContainer.text(f"Treinando modelo na época {epoch + 1}...")
         
         # Loop de validação cruzada
         # (Fazemos todas as validação cruzadas para a epoch 1, depois para epoch 2....)
@@ -655,13 +670,9 @@ def crossValidationVGG16(csv):
 
             # Treinamento
             if (not modeloJaTreinadoNoHD):
-                pesoDasClasses = torch.tensor([38/55, 17/55], device=device)
-                criterion = nn.CrossEntropyLoss(weight=pesoDasClasses) # A funçõ de perda / loss
-                optimizer = optim.Adam(model.parameters(), lr=0.001) # Otimizador
 
                 model.train()
                 scaler = GradScaler()
-                secondStatusContainer.text(f"Loss acumulada média: {lossacumulada / (i // batch_size + 1)}")
                 optimizer.zero_grad();
                 
                 # With autocast faz com que as operações dentro do bloco sejam feitas com precisão float16 em vez de float32 (pra nao estourar a memoria)
@@ -673,6 +684,7 @@ def crossValidationVGG16(csv):
                 scaler.step(optimizer)  # Atualiza os pesos
                 scaler.update()
                 lossacumulada += loss.item()
+                secondStatusContainer.text(f"Loss acumulada média: {lossacumulada / (i // batch_size + 1)}")
                 torch.cuda.empty_cache()
 
             # Predição
@@ -681,16 +693,9 @@ def crossValidationVGG16(csv):
                 y_pred = model(X_test)
                 y_pred_classes = torch.argmax(y_pred, axis=1).cpu().numpy()
 
-            # Acurácia e relatórios
-            acuracias.append(accuracy_score(y_test.cpu().numpy(), y_pred_classes))
-            relatorios.append(classification_report(y_test.cpu().numpy(), y_pred_classes))
-
             # Matriz de confusão
             matriz_confusao = confusion_matrix(y_test.cpu().numpy(), y_pred_classes, labels=[0, 1])          
 
-            matrizes_confusao.append(matriz_confusao)
-
-        
             # Sensibilidade e especificidade
             tp = matriz_confusao[1, 1]
             tn = matriz_confusao[0, 0]
@@ -700,21 +705,22 @@ def crossValidationVGG16(csv):
             sensibilidade = tp / (tp + fn) if tp + fn > 0 else 0
             especificidade = tn / (tn + fp) if tn + fp > 0 else 0
 
-            print(sensibilidade)
-            print(especificidades)
-            sensibilidades.append(sensibilidade)
-            especificidades.append(especificidade)
+            acuracias_epoch.append(accuracy_score(y_test.cpu().numpy(), y_pred_classes))
+            relatorios_epoch.append(classification_report(y_test.cpu().numpy(), y_pred_classes))
+            matrizes_confusao_epoch.append(matriz_confusao)
+            sensibilidades_epoch.append(sensibilidade)
+            especificidades_epoch.append(especificidade)
         
         
         salvar_modelo(model, epoch=epoch)
         # Resultados da epoch
         st.title(f"Resultados da Validação Cruzada Epoch {epoch + 1}")
-        st.write("Média de Acurácias:", np.mean(acuracias))
-        st.write("Média de Sensibilidade:", np.mean(sensibilidades))
-        st.write("Média de Especificidade:", np.mean(especificidades))
+        st.write("Média de Acurácias:", np.mean(acuracias_epoch))
+        st.write("Média de Sensibilidade:", np.mean(sensibilidades_epoch))
+        st.write("Média de Especificidade:", np.mean(especificidades_epoch))
 
         # Matriz de confusão média
-        matriz_confusao_media = np.sum(matrizes_confusao, axis=0)
+        matriz_confusao_media = np.sum(matrizes_confusao_epoch, axis=0)
         st.write("Matriz de Confusão Média:")
         plot_matriz_confusao(matriz_confusao_media)
 
