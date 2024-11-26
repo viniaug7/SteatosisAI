@@ -6,11 +6,12 @@
 #ND = VGG16
 # Como rodar:
 # Use python 3.10
-# pip install streamlit streamlit-cropper scipy numpy matplotlib setuptools opencv-python streamlit_image_zoom scikit-image scikit-learn torch torchvision
+# pip install streamlit streamlit-cropper scipy numpy matplotlib setuptools opencv-python streamlit_image_zoom scikit-image scikit-learn torch torchvision pickle
 # streamlit run interface.py
 import streamlit as st
 from random import randint
 from sklearn.svm import SVC
+import pickle
 import scipy.io
 from streamlit_cropper import st_cropper
 import torch
@@ -108,7 +109,7 @@ st.set_page_config(layout="wide")
 
 
 # st.title("Trabalho PAI")
-mainTab, verROITab, treinarSVMTab, treinarVGGTab, classificarTab  = st.tabs(["Imagem & Cortar ROI", "Ver ROIs", "TreinarSVM", "TreinarVGG16", 'Classificar'])
+mainTab, verROITab, treinarSVMTab, treinarVGGTab, classificarSVMTab, classificarVGGTab  = st.tabs(["Imagem & Cortar ROI", "Ver ROIs", "TreinarSVM", "TreinarVGG16", "Classificar com SVM", "Classificar com VGG16"])
 mainContainer = mainTab.container()
 
 if "ROIsSalvos" not in st.session_state:
@@ -397,8 +398,10 @@ def SVM(X_train, y_train, X_test):#poli 100|rbf10|rbf100 -> 83
     # Treinamento do modelo
     model = SVC(C=10,kernel="linear", class_weight={0:38/55, 1:17/55},random_state=42)#kernel="linear", random_state=42{55/17,55/38}
     model.fit(X_train, y_train)
+    with open('modelos/modelo_svm.pkl', 'wb') as file:
+        pickle.dump(model, file)
 
-    # Predição e avaliação
+
     return model.predict(X_test)
 
 
@@ -562,7 +565,7 @@ def carregar_e_processar_imagens(caminhos):
 
 
 
-def salvar_modelo(model, epoch, caminho="modelos"):
+def salvar_modeloVGG(model, epoch, caminho="modelos"):
     """Salva o modelo em um arquivo com base no número da época (epoch)."""
     if not os.path.exists(caminho):
         os.makedirs(caminho)
@@ -601,7 +604,7 @@ def crossValidationVGG16(csv):
     assert X_tensor.shape[0] == len(y_tensor), "O número de imagens e rótulos não coincide!"
 
     # Divisão em batches para validação cruzada
-    batch_size = 10
+    batch_size = 200
     n_samples = len(X_tensor)
 
     # Verificar se o número de amostras é divisível pelo batch_size
@@ -625,7 +628,7 @@ def crossValidationVGG16(csv):
     criterion = nn.CrossEntropyLoss(weight=pesoDasClasses) # A funçõ de perda / loss
     optimizer = optim.Adam(model.parameters(), lr=0.01) # Otimizador
 
-    for epoch in range(10): 
+    for epoch in range(2): 
         acuracias_epoch = []
         relatorios_epoch = []
         matrizes_confusao_epoch = []
@@ -713,7 +716,7 @@ def crossValidationVGG16(csv):
             especificidades_epoch.append(especificidade)
         
         
-        salvar_modelo(model, epoch=epoch)
+        salvar_modeloVGG(model, epoch=epoch)
         # Resultados da epoch
         st.title(f"Resultados da Validação Cruzada Epoch {epoch + 1}")
         st.write("Média de Acurácias:", np.mean(acuracias_epoch))
@@ -738,3 +741,75 @@ with treinarVGGTab:
     arquivo = st.file_uploader("Escolha o arquivo CSV para o VGG", type=["csv"])
     if (arquivo):
         crossValidationVGG16(arquivo)
+
+
+with classificarSVMTab:
+    with open('modelos/modelo_svm.pkl', 'rb') as file:
+        modelo_carregado = pickle.load(file)
+    arquivo = st.file_uploader("Escolha o arquivo CSV para classificar com SVM", type=["csv"])
+    if (arquivo):
+        df = preProcessarCsvs(arquivo)
+        comNome = preProcessarCsvs(arquivo, dropNome=False)
+        # Separar dados e classe
+        y = df["classe"].replace({'saudavel': 1, 'esteatose': 0})
+        X = df.drop(columns=["classe"])
+
+        scaler = MinMaxScaler()
+        X_scaled = scaler.fit_transform(X)
+        # Fazer tabela somente com csv[nome] predição, e se ela estava certa
+        y_pred = modelo_carregado.predict(X_scaled)
+        # Criar df novo para mostrar
+        novoDf = pd.DataFrame()
+        novoDf["Nome"] = comNome["nome"]
+        novoDf["Classe Real"] = df["classe"]
+        # Transfomrar o y_pred de volta pra saudavel e esteatose
+        novoDf["Classe Predita"] = ['saudavel' if pred == 1 else 'esteatose' for pred in y_pred] 
+        novoDf["Correto"] = novoDf["Classe Real"] == novoDf["Classe Predita"]
+        st.write(novoDf)
+
+
+with classificarVGGTab:
+    arquivo = st.file_uploader("Escolha o arquivo CSV para classificar com VGG", type=["csv"])
+    if (arquivo):
+        df = preProcessarCsvs(arquivo, dropNome=False)
+        statusContainer = st.empty()
+        secondStatusContainer = st.empty();
+        # Separar dados e classe
+        y = df["classe"].values
+        caminhos_imagens = df["nome"].values
+        y = [1 if classe == 'saudavel' else 0 for classe in y]
+
+        model = models.vgg16(weights=models.VGG16_Weights.IMAGENET1K_V1)  # Carrega o modelo sem a camada densa no topo
+        model.classifier[6] = nn.Linear(4096, len(set(y)))  # Ajustando a saída para o número de classes
+        model = carregar_modelo(model, epoch=1)
+
+        # Carregar todas as imagens e processá-las
+        X_tensor = carregar_e_processar_imagens(caminhos_imagens)
+        y_tensor = torch.tensor(y, dtype=torch.long)
+
+        # Fazer model.predict em todas as imagens
+        model.eval()
+        y_pred = []
+        for i in range(0, len(X_tensor), 200):
+            statusContainer.text(f"Classificando imagens {i}/{len(X_tensor)}...")
+            if i + 200 > len(X_tensor):
+                X_test = X_tensor[i:]
+            else:
+                X_test = X_tensor[i:i+200]
+            with torch.no_grad():
+                y_pred_batch = model(X_test)
+                y_pred_classes = torch.argmax(y_pred_batch, axis=1).cpu().numpy()
+                y_pred.extend(y_pred_classes)
+        # Criar df novo para mostrar
+        novoDf = pd.DataFrame()
+        novoDf["Nome"] = df["nome"]
+        novoDf["Classe Real"] = df["classe"]
+        novoDf['Classe Predita'] = ['saudavel' if pred == 1 else 'esteatose' for pred in y_pred]
+        novoDf["Correto"] = novoDf["Classe Real"] == novoDf["Classe Predita"]
+        st.write(novoDf)
+
+
+
+
+
+
