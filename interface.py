@@ -395,9 +395,9 @@ def pegaMomentoHu(lista, i):
         # st.write(lista)
     return lista[i]
 
-def SVM(X_train, y_train, X_test):#poli 100|rbf10|rbf100 -> 83   
+def SVM(X_train, y_train, X_test):#poli 100|rbf10|rbf100 -> 83   c10 poly 0:38/55, 1:85/55
     # Treinamento do modelo
-    model = SVC(C=10,kernel="linear", class_weight={0:38/55, 1:17/55},random_state=42)#kernel="linear", random_state=42{55/17,55/38}
+    model = SVC(C=100,kernel="rbf", class_weight={0:38/55, 1:85/55},random_state=42)#kernel="linear", random_state=42{55/17,55/38}
     model.fit(X_train, y_train)
     if not os.path.exists('modelos'):
         os.makedirs('modelos')
