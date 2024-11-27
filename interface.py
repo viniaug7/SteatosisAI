@@ -441,6 +441,7 @@ def crossValidationSVM(csv):
     y = df["classe"].replace({'saudavel': 1, 'esteatose': 0})
     X = df.drop(columns=["classe"])
 
+    tempo = time.time()
     scaler = MinMaxScaler()
     X_scaled = scaler.fit_transform(X)
 
@@ -488,9 +489,11 @@ def crossValidationSVM(csv):
         especificidades.append(especificidade)
 
     # Exibindo as métricas gerais ao final
+    tempo = time.time() - tempo
     st.write("Média de Acurácias:", np.mean(acuracias))
     st.write("Média de Sensibilidade:", np.mean(sensibilidades))
     st.write("Média de Especificidade:", np.mean(especificidades))
+    st.write("Tempo de Execução:", tempo, "segundos")
     # Exibindo a matriz de confusão geral (somatória de todas as iterações)
     st.write("Matriz de Confusão Média (somatória de todas as iterações):")
     matriz_confusao_media = np.sum(matrizes_confusao, axis=0)
