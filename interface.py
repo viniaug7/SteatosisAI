@@ -8,6 +8,7 @@
 # Use python 3.10
 # pip install streamlit streamlit-cropper scipy numpy matplotlib setuptools opencv-python streamlit_image_zoom scikit-image scikit-learn torch torchvision pickle
 # streamlit run interface.py
+import time
 import streamlit as st
 from random import randint
 from sklearn.svm import SVC
@@ -440,6 +441,7 @@ def crossValidationSVM(csv):
     y = df["classe"].replace({'saudavel': 1, 'esteatose': 0})
     X = df.drop(columns=["classe"])
 
+    tempo = time.time()
     scaler = MinMaxScaler()
     X_scaled = scaler.fit_transform(X)
 
@@ -487,10 +489,11 @@ def crossValidationSVM(csv):
         especificidades.append(especificidade)
 
     # Exibindo as métricas gerais ao final
+    tempo = time.time() - tempo
     st.write("Média de Acurácias:", np.mean(acuracias))
     st.write("Média de Sensibilidade:", np.mean(sensibilidades))
     st.write("Média de Especificidade:", np.mean(especificidades))
-
+    st.write("Tempo de Execução:", tempo, "segundos")
     # Exibindo a matriz de confusão geral (somatória de todas as iterações)
     st.write("Matriz de Confusão Média (somatória de todas as iterações):")
     matriz_confusao_media = np.sum(matrizes_confusao, axis=0)
@@ -616,8 +619,7 @@ def crossValidationVGG16(csv):
 
     # Métricas gerais
     acuracias = []
-    relatorios = []
-    matrizes_confusao = []
+    acuracias_treino = []
     especificidades = []
     sensibilidades = []
 
@@ -636,13 +638,17 @@ def crossValidationVGG16(csv):
 
     for epoch in range(10): 
         acuracias_epoch = []
+        acuracias_treino_epoch = []
         relatorios_epoch = []
         matrizes_confusao_epoch = []
+        tempos_epoch = []
         sensibilidades_epoch = []
         especificidades_epoch = []
         statusContainer.text(f"Treinando modelo na época {epoch + 1}...")
 
         lossacumulada = 0.0
+        # Contar quanto tempo gasta
+        tempo = time.time()
         for i in range(0, n_samples, batch_size):
             # Falar em que época, em que batch e quantos batches faltam
             statusContainer.text(f"Época {epoch + 1}, Cross validation {i // batch_size}/{n_samples // batch_size}...")
@@ -676,8 +682,15 @@ def crossValidationVGG16(csv):
             lossacumulada += loss.item()
             secondStatusContainer.text(f"Loss acumulada média: {lossacumulada / (i // batch_size + 1)}")
             torch.cuda.empty_cache()
+            
+            # Acurácia de treino
+            _, predito_treino = torch.max(outputs, 1)
+            predito_correto = (predito_treino == y_train).sum().item()
+            predito_total = y_train.size(0)
+            acuracia_treino = predito_correto / predito_total
+            acuracias_treino_epoch.append(acuracia_treino)
 
-            # Predição
+            # Predição do teste
             model.eval()
             with torch.no_grad():
                 y_pred = model(X_test)
@@ -702,16 +715,20 @@ def crossValidationVGG16(csv):
             especificidades_epoch.append(especificidade)
         
         
+        tempo = time.time() - tempo
         salvar_modeloVGG(model, epoch=epoch)
         # Resultados da epoch
         st.title(f"Resultados da Validação Cruzada Epoch {epoch + 1}")
-        st.write("Média de Acurácias:", np.mean(acuracias_epoch))
+        st.write("Média de Acurácias (Teste):", np.mean(acuracias_epoch))
+        st.write("Média de Acurácias (Treino):", np.mean(acuracias_treino_epoch))
         st.write("Média de Sensibilidade:", np.mean(sensibilidades_epoch))
         st.write("Média de Especificidade:", np.mean(especificidades_epoch))
+        st.write("Tempo de treinamento:", tempo, "segundos")
+        tempos_epoch.append(tempo)
         acuracias.append(np.mean(acuracias_epoch))
+        acuracias_treino.append(np.mean(acuracias_treino_epoch))
         sensibilidades.append(np.mean(sensibilidades_epoch))
         especificidades.append(np.mean(especificidades_epoch))
-        matrizes_confusao.append(matrizes_confusao_epoch)
 
         # Matriz de confusão média
         matriz_confusao_media = np.sum(matrizes_confusao_epoch, axis=0)
@@ -719,10 +736,20 @@ def crossValidationVGG16(csv):
         plot_matriz_confusao(matriz_confusao_media)
 
     st.title("Resultados Finais")
-    st.write("Média de Acurácias:", np.mean(acuracias))
+    st.write("Média de Acurácias (Teste):", np.mean(acuracias))
+    st.write("Média de Acurácias (Treino):", np.mean(acuracias_treino))
     st.write("Média de Sensibilidade:", np.mean(sensibilidades))
     st.write("Média de Especificidade:", np.mean(especificidades))
-    plot_matriz_confusao(np.sum(matrizes_confusao, axis=0))  # Exibindo a matriz de confusão média
+    st.write("Média de Tempos de Treinamento:", np.mean(tempos_epoch))
+
+    # Plotar acuracias em um gráfico
+    plt.plot(acuracias, label='Acurácia (Teste)')
+    plt.plot(acuracias_treino, label='Acurácia (Treino)')
+    plt.xlabel('Época')
+    plt.ylabel('Acurácia')
+    plt.legend()
+    st.pyplot(plt)
+    plt.clf()
 
 
 
@@ -775,7 +802,7 @@ with classificarVGGTab:
 
         model = models.vgg16(weights=models.VGG16_Weights.IMAGENET1K_V1)  # Carrega o modelo sem a camada densa no topo
         model.classifier[6] = nn.Linear(4096, len(set(y)))  # Ajustando a saída para o número de classes
-        model = carregar_modelo(model, epoch=1)
+        model = carregar_modelo(model, epoch=9)
 
         # Carregar todas as imagens e processá-las
         X_tensor = carregar_e_processar_imagens(caminhos_imagens)
@@ -795,6 +822,7 @@ with classificarVGGTab:
                 y_pred_classes = torch.argmax(y_pred_batch, axis=1).cpu().numpy()
                 y_pred.extend(y_pred_classes)
         # Criar df novo para mostrar
+        statusContainer.text("Classificação concluída!")
         novoDf = pd.DataFrame()
         novoDf["Nome"] = df["nome"]
         novoDf["Classe Real"] = df["classe"]
