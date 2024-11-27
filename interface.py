@@ -48,10 +48,15 @@ if not os.path.isfile(CLASSES_CSV_FILENAME):
 
 
 def salvarROIEmCSVePasta(imagemFigado, n, m, coordsFigado, coordsRim, HI, dadosGLCM): 
+    if (n is None):
+        id = gerar_id_unico(5000)
+        n = id;
+        m = id 
     nFormatado = str(n).zfill(2)
     mFormatado = str(m)
     nomeDoArquivo = f'ROI_{nFormatado}_{mFormatado}.jpg'
     imagemFigado.save(nomeDoArquivo)
+    
 
     coordsFigadoASalvar = f"{coordsFigado['left']}-{coordsFigado['top']}"
     coordsRimASalvar = f"{coordsRim['left']}-{coordsRim['top']}"
@@ -136,7 +141,7 @@ def escolherImagem(imagem, n,m):
 
 @st.cache_data
 def carregar_imagem(upload):
-    return Image.open(upload)
+    return Image.open(upload).convert('L') # grayscale
 
 @st.cache_data
 def loadMat(arquivo_mat):
