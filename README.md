@@ -14,10 +14,18 @@ Além da implementação dos modelos, o sistema conta com uma **interface gráfi
 - **Pré-processamento de imagens**: recorte de ROIs (fígado e rim), cálculo do índice hepatorenal (HI) e normalização.  
 - **Extração de características**: GLCM (descritores de Haralick) e Momentos Invariantes de Hu.  
 - **Classificação**:  
-  - 🔹 **SVM** (rápido, baseado em descritores manuais).  
-  - 🔹 **VGG16** (aprendizado profundo com transfer learning).  
+  - **SVM** (rápido, baseado em descritores manuais).  
+  - **VGG16** (aprendizado profundo com transfer learning).  
 - **Interface web (Streamlit)**:  
   - Visualização de imagens e ROIs.  
   - Seleção e corte interativo de regiões.  
   - Treinamento e classificação diretamente via navegador.  
-- **Comparação de desempenho** entre os classificadores. 
+- **Comparação de desempenho** entre os classificadores.
+
+---
+
+## Autores e Alunos
+
+- Eric Miranda – Aluno, PUC Minas
+- Gustavo Lorenzo – Aluno, PUC Minas
+- Vinícius Augusto – Aluno, PUC Minas
